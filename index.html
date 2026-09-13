@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Parda — a local agent that governs what leaves you</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --inside:#F4F2ED;      /* warm: on the device */
+  --outside:#DFE1E3;     /* cold: beyond the boundary */
+  --ink:#14181C;
+  --ink-2:#4C555E;
+  --line:#C9CCC6;
+  --gate:#C9412A;        /* the boundary */
+  --cleared:#2F6B4F;
+  --held:#8A5A12;
+  --panel:#FBFAF7;
+}
+*{box-sizing:border-box}
+body{
+  margin:0;background:var(--inside);color:var(--ink);
+  font-family:Inter,system-ui,sans-serif;font-size:15px;line-height:1.55;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1200px;margin:0 auto;padding:0 20px 70px}
+h1,h2,h3{font-family:"Space Grotesk",sans-serif;margin:0}
+
+/* masthead */
+header.top{padding:26px 0 16px;border-bottom:3px solid var(--gate);margin-bottom:24px;
+  display:flex;flex-wrap:wrap;gap:20px;align-items:flex-end;justify-content:space-between}
+header.top h1{font-size:34px;font-weight:700;letter-spacing:-0.02em}
+header.top p{margin:6px 0 0;max-width:58ch;color:var(--ink-2);font-size:14px}
+.badge{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--ink-2);text-align:right;line-height:1.7}
+.badge b{color:var(--gate)}
+
+/* egress receipt */
+.receipt{display:flex;flex-wrap:wrap;gap:26px;align-items:center;
+  background:var(--ink);color:#fff;padding:11px 16px;margin-bottom:18px}
+.receipt .rk{font-family:"IBM Plex Mono",monospace;font-size:10.5px;
+  letter-spacing:0.1em;text-transform:uppercase;color:#8F99A2;display:block}
+.receipt .rv{font-family:"IBM Plex Mono",monospace;font-size:15px;font-weight:600;color:#fff}
+.receipt .rv.absent{color:var(--gate)}
+.receipt .rn{flex:1;min-width:240px;font-size:11.5px;color:#A9B2BA;line-height:1.45}
+
+/* channel tabs */
+.tabs{display:flex;gap:0;margin-bottom:22px;border-bottom:1px solid var(--line)}
+.tab{font:inherit;font-weight:600;font-size:14px;background:none;border:none;
+  padding:11px 18px;cursor:pointer;color:var(--ink-2);border-bottom:3px solid transparent;margin-bottom:-1px}
+.tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--gate)}
+.tab:hover{color:var(--ink)}
+
+/* the boundary layout */
+.boundary{display:grid;grid-template-columns:1fr 3px 1fr;gap:0;align-items:stretch}
+@media(max-width:920px){.boundary{grid-template-columns:1fr}.gateline{display:none}}
+.side{padding:18px}
+.side.in{background:var(--panel);border:1px solid var(--line);border-right:none}
+.side.out{background:var(--outside);border:1px solid var(--line);border-left:none}
+@media(max-width:920px){
+  .side.in{border-right:1px solid var(--line);border-bottom:3px solid var(--gate)}
+  .side.out{border-left:1px solid var(--line)}
+}
+.gateline{background:var(--gate);position:relative}
+.gateline::after{
+  content:"GATE";position:absolute;top:50%;left:50%;
+  transform:translate(-50%,-50%) rotate(90deg);
+  font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:0.25em;
+  color:var(--gate);background:var(--inside);padding:5px 8px;white-space:nowrap;
+}
+.side h3{font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:var(--ink-2);margin-bottom:12px}
+
+/* generic bits */
+textarea,select{width:100%;font:inherit;border:1px solid var(--line);border-radius:2px;
+  padding:10px;background:#fff;color:var(--ink);font-size:13.5px}
+textarea{min-height:150px;resize:vertical;font-family:"IBM Plex Mono",monospace;font-size:12.5px;line-height:1.65}
+button.act{font:inherit;font-weight:600;font-size:14px;background:var(--ink);color:#fff;
+  border:none;border-radius:2px;padding:10px 18px;cursor:pointer}
+button.act:hover{background:#000}
+button.act:disabled{opacity:.4;cursor:not-allowed}
+button.mini{font:inherit;font-size:12.5px;font-weight:600;background:#fff;color:var(--ink);
+  border:1px solid var(--ink);border-radius:2px;padding:5px 11px;cursor:pointer}
+button.mini:hover{background:var(--ink);color:#fff}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:12px}
+:focus-visible{outline:2px solid var(--gate);outline-offset:2px}
+.hint{font-size:12.5px;color:var(--ink-2);margin-top:8px}
+.mono{font-family:"IBM Plex Mono",monospace;font-size:12.5px}
+
+/* findings */
+.finding{border:1px solid var(--line);background:#fff;border-radius:2px;padding:10px 12px;margin-bottom:8px}
+.finding .ft{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+.finding .code{font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--ink-2)}
+.finding .name{font-weight:600;font-size:13.5px}
+.finding .why{font-size:12.5px;color:var(--ink-2);margin-top:3px}
+.finding .cost{font-family:"IBM Plex Mono",monospace;font-weight:600;color:var(--gate);font-size:13px}
+.finding.fixed{opacity:.55}
+.finding.fixed .cost{color:var(--cleared);text-decoration:line-through}
+
+/* payload views */
+.payload{background:#fff;border:1px solid var(--line);padding:12px;font-family:"IBM Plex Mono",monospace;
+  font-size:12.5px;line-height:1.75;white-space:pre-wrap;word-break:break-word;max-height:280px;overflow:auto}
+mark.pii{background:#F6E3C8;color:#6B4408;padding:0 2px;border-radius:2px}
+mark.sur{background:#D9E7DE;color:var(--cleared);padding:0 2px;border-radius:2px;font-weight:600}
+
+/* verdict strip */
+.verdict{border:2px solid var(--ink);padding:11px 14px;margin-bottom:14px;display:flex;
+  gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.verdict.local{border-color:var(--cleared);background:#E7F0EA}
+.verdict.escalate{border-color:var(--held);background:#FBF2DF}
+.verdict .big{font-family:"Space Grotesk",sans-serif;font-weight:700;font-size:16px}
+.verdict .sm{font-size:12.5px;color:var(--ink-2)}
+
+/* checkout mock */
+.cart{background:#fff;border:1px solid var(--line);padding:14px}
+.li{display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid #EFEFEA;font-size:13.5px}
+.li:last-of-type{border-bottom:none}
+.li .lbl{display:flex;gap:8px;align-items:flex-start}
+.li input[type=checkbox]{margin-top:3px;accent-color:var(--gate);width:15px;height:15px}
+.li .amt{font-family:"IBM Plex Mono",monospace;white-space:nowrap}
+.li.sneak{background:#FBF2DF;margin:0 -14px;padding:7px 14px}
+.total{display:flex;justify-content:space-between;border-top:2px solid var(--ink);
+  margin-top:10px;padding-top:9px;font-weight:700;font-size:15px}
+.total .amt{font-family:"IBM Plex Mono",monospace}
+.urgency{font-size:12px;color:var(--gate);font-weight:600;margin-top:9px}
+.guilt{font-size:12px;color:var(--ink-2);font-style:italic;margin-top:5px}
+
+/* policy */
+.policy{margin-top:22px;border:1px solid var(--line);background:var(--panel);padding:16px}
+.policy h3{font-size:13px;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);margin-bottom:10px}
+.prule{display:flex;gap:10px;align-items:center;padding:7px 0;border-bottom:1px solid #EDEDE7;font-size:13.5px}
+.prule:last-child{border-bottom:none}
+.prule select{width:auto;padding:4px 8px;font-size:12.5px}
+.prule .pk{font-family:"IBM Plex Mono",monospace;font-size:12.5px;min-width:190px}
+
+/* ledger */
+.ledger{margin-top:22px;border:1px solid var(--line);background:var(--panel);padding:16px}
+.ledger h3{font-size:13px;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);margin-bottom:4px}
+.ledger > p{margin:0 0 12px;font-size:12.5px;color:var(--ink-2)}
+.lentry{display:grid;grid-template-columns:78px 92px 1fr;gap:12px;padding:8px 0;
+  border-bottom:1px solid #EDEDE7;font-size:13px;align-items:baseline}
+.lentry:last-child{border-bottom:none}
+.lentry .t{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--ink-2)}
+.lentry .v{font-family:"IBM Plex Mono",monospace;font-size:10.5px;font-weight:600;padding:2px 6px;text-align:center}
+.v.blocked{background:#F6DED9;color:var(--gate)}
+.v.local{background:#D9E7DE;color:var(--cleared)}
+.v.released{background:#FBF0DA;color:var(--held)}
+.v.fixed{background:#D9E7DE;color:var(--cleared)}
+.empty{color:var(--ink-2);font-size:13px;padding:6px 0}
+
+footer{margin-top:34px;padding-top:14px;border-top:1px solid var(--line);
+  font-size:12.5px;color:var(--ink-2)}
+code{font-family:"IBM Plex Mono",monospace;font-size:12px;background:#E9E9E3;padding:1px 4px}
+[hidden]{display:none !important}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="top">
+  <div>
+    <h1>Parda</h1>
+    <p>Two things leave your phone without your meaningful consent: your data, and your money. Parda stands at both boundaries under one policy you own — and it holds no network permission, so it cannot transmit anything itself.</p>
+  </div>
+  <div class="badge">
+    <b>TEAM GOLD</b><br>
+    Hammer2.1-1.5B · GBNF-constrained<br>
+    android.permission.INTERNET — not declared
+  </div>
+</header>
+
+<div class="receipt">
+  <div>
+    <span class="rk">Egress this session</span>
+    <span class="rv" id="egress">0 bytes</span>
+  </div>
+  <div>
+    <span class="rk">Network permission</span>
+    <span class="rv absent">not declared</span>
+  </div>
+  <div class="rn">Parda cannot open a socket. Anything that leaves does so through your share sheet, by your own hand.</div>
+</div>
+
+<div class="tabs" role="tablist">
+  <button class="tab" role="tab" id="tab-b" aria-selected="true" aria-controls="ch-b">Channel B — data boundary</button>
+  <button class="tab" role="tab" id="tab-a" aria-selected="false" aria-controls="ch-a">Channel A — money boundary</button>
+</div>
+
+<!-- ================= CHANNEL B ================= -->
+<section id="ch-b" role="tabpanel" aria-labelledby="tab-b">
+  <div id="verdictB"></div>
+  <div class="boundary">
+    <div class="side in">
+      <h3>Inside the device</h3>
+      <textarea id="inputB" aria-label="Text you are about to send"></textarea>
+      <div class="row">
+        <button class="act" id="runB">Ask the agent</button>
+        <button class="mini" id="sampleB">Load a sample</button>
+        <button class="mini" id="hardB">Ask something harder</button>
+      </div>
+      <div class="hint" id="hintB">The agent classifies what's in this text, applies your policy, and decides whether it can answer without anything needing to leave.</div>
+      <div id="foundB" style="margin-top:14px"></div>
+      <div id="vaultB" hidden style="margin-top:14px">
+        <h3>Vault — never transmitted</h3>
+        <div class="payload" id="vaultBody"></div>
+      </div>
+    </div>
+    <div class="gateline"></div>
+    <div class="side out">
+      <h3>What Parda hands back to you</h3>
+      <div class="payload" id="outB">Nothing has been handed back.</div>
+      <div class="hint" id="outHintB">This is what lands on your clipboard if you choose to ask an outside model. Parda does not send it — you do, or you don't.</div>
+      <div id="answerB" hidden style="margin-top:14px">
+        <h3>Answer</h3>
+        <div class="payload" id="answerBody"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= CHANNEL A ================= -->
+<section id="ch-a" role="tabpanel" aria-labelledby="tab-a" hidden>
+  <div id="verdictA"></div>
+  <div class="boundary">
+    <div class="side in">
+      <h3>The checkout screen, as read by the agent</h3>
+      <div class="cart" id="cart"></div>
+      <div class="row">
+        <button class="act" id="runA">Scan this screen</button>
+        <button class="mini" id="resetA">Reset the cart</button>
+      </div>
+      <div class="hint">Read through AccessibilityService in the Android build, with the phone fully online — because that is when you shop. Parda never taps Pay; every fix is offered, never forced.</div>
+    </div>
+    <div class="gateline"></div>
+    <div class="side out">
+      <h3>What the agent found</h3>
+      <div id="foundA"><p class="empty">Scan the screen to see what it is doing to you.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= POLICY ================= -->
+<div class="policy">
+  <h3>Disclosure policy — yours, on the device</h3>
+  <div id="policyRules"></div>
+  <div class="hint">One policy governs both boundaries. The agent proposes; this policy and the outbound gate decide. Change a rule and re-run either channel.</div>
+</div>
+
+<!-- ================= LEDGER ================= -->
+<div class="ledger">
+  <h3>Decision ledger</h3>
+  <p>Append-only. Every decision at either boundary, whether or not anything was handed back.</p>
+  <div id="ledgerBody"><p class="empty">No decisions recorded yet.</p></div>
+  <div class="row"><button class="mini" id="clearLedger">Clear</button></div>
+</div>
+
+<footer>
+  Team GOLD · The agent plans and classifies. Deterministic code decides and executes. A wrong model output produces a wrong suggestion, never a wrong disclosure — and with no network permission declared, Parda has no way to disclose anything itself.
+</footer>
+</div>
+
+<script>
+"use strict";
+const $=id=>document.getElementById(id);
+
+/* ===================== POLICY ENGINE ===================== */
+const POLICY=[
+  {key:"gov_id",        label:"Government ID numbers",   act:"block"},
+  {key:"bank_account",  label:"Bank / card numbers",     act:"block"},
+  {key:"person_name",   label:"Personal names",          act:"surrogate"},
+  {key:"money_amount",  label:"Salary and amounts",      act:"surrogate"},
+  {key:"phone",         label:"Phone numbers",           act:"surrogate"},
+  {key:"email",         label:"Email addresses",         act:"surrogate"},
+  {key:"address",       label:"Addresses",               act:"surrogate"},
+  {key:"dark_pattern",  label:"Dark patterns at checkout", act:"flag"}
+];
+const ACTS={block:"Block outright",surrogate:"Replace with a surrogate",flag:"Flag for me",allow:"Let it pass"};
+
+function renderPolicy(){
+  $("policyRules").innerHTML=POLICY.map(r=>`
+    <div class="prule">
+      <span class="pk">${r.key}</span>
+      <span style="flex:1">${r.label}</span>
+      <select data-pk="${r.key}" aria-label="Policy for ${r.label}">
+        ${Object.entries(ACTS).map(([v,l])=>`<option value="${v}" ${v===r.act?"selected":""}>${l}</option>`).join("")}
+      </select>
+    </div>`).join("");
+  $("policyRules").querySelectorAll("select").forEach(s=>{
+    s.addEventListener("change",()=>{
+      POLICY.find(r=>r.key===s.dataset.pk).act=s.value;
+    });
+  });
+}
+const policyFor=k=>(POLICY.find(r=>r.key===k)||{act:"allow"}).act;
+
+/* ===================== CLASSIFIER (deterministic) ===================== */
+const DETECTORS=[
+  {key:"gov_id",       label:"Aadhaar / PAN",   re:/\b(?:\d{4}\s?\d{4}\s?\d{4}|[A-Z]{5}\d{4}[A-Z])\b/g},
+  {key:"bank_account", label:"Account number",  re:/\b\d{9,18}\b/g},
+  {key:"email",        label:"Email",           re:/\b[\w.+-]+@[\w-]+\.[\w.]{2,}\b/g},
+  {key:"phone",        label:"Phone",           re:/\b(?:\+91[-\s]?)?[6-9]\d{9}\b/g},
+  {key:"money_amount", label:"Amount",          re:/(?:₹|Rs\.?\s?|INR\s?)[\d,]+(?:\.\d{2})?/g},
+  {key:"person_name",  label:"Name",            re:/\b(?:Mr|Ms|Mrs|Shri|Smt)\.?\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?\b/g},
+  {key:"address",      label:"Address",         re:/\b\d{1,4}[-/]?\d{0,3},?\s+[A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)*,\s*(?:Hyderabad|Bengaluru|Mumbai|Delhi|Chennai|Pune)\b[^,\n]*/g}
+];
+
+/* order matters: longest spans first so a phone inside an account number
+   does not get double-matched */
+function classify(text){
+  const found=[]; const taken=[];
+  const overlaps=(s,e)=>taken.some(([a,b])=>s<b&&e>a);
+  for(const d of DETECTORS){
+    d.re.lastIndex=0; let m;
+    while((m=d.re.exec(text))!==null){
+      const s=m.index, e=s+m[0].length;
+      if(overlaps(s,e)) continue;
+      taken.push([s,e]);
+      found.push({key:d.key,label:d.label,value:m[0],start:s,end:e});
+    }
+  }
+  return found.sort((a,b)=>a.start-b.start);
+}
+
+/* ===================== SURROGATES ===================== */
+const PREFIX={gov_id:"GOVID",bank_account:"ACCT",email:"EMAIL",phone:"PHONE",
+              money_amount:"AMOUNT",person_name:"PERSON",address:"ADDRESS"};
+function applyPolicy(text,found){
+  const counters={}, vault=[]; let out="", cursor=0, blocked=false;
+  for(const f of found){
+    const act=policyFor(f.key);
+    out+=text.slice(cursor,f.start);
+    if(act==="allow"){ out+=f.value; }
+    else if(act==="block"){ out+="[BLOCKED]"; blocked=true; vault.push({tok:"[BLOCKED]",real:f.value,key:f.key,act}); }
+    else{
+      const p=PREFIX[f.key]||"ITEM";
+      counters[p]=(counters[p]||0)+1;
+      const tok=`<${p}_${counters[p]}>`;
+      out+=tok; vault.push({tok,real:f.value,key:f.key,act:"surrogate"});
+    }
+    cursor=f.end;
+  }
+  out+=text.slice(cursor);
+  return {sanitized:out,vault,blocked};
+}
+
+/* ===================== LEDGER ===================== */
+const LEDGER=[];
+function log(verdict,channel,detail){
+  LEDGER.unshift({t:new Date().toLocaleTimeString([], {hour:"2-digit",minute:"2-digit",second:"2-digit"}),
+                  verdict,channel,detail});
+  renderLedger();
+}
+function renderLedger(){
+  if(!LEDGER.length){ $("ledgerBody").innerHTML='<p class="empty">No decisions recorded yet.</p>'; return; }
+  const cls={ "held locally":"local", "handed back":"released", "blocked":"blocked", "fixed":"fixed" };
+  $("ledgerBody").innerHTML=LEDGER.map(e=>`
+    <div class="lentry">
+      <span class="t">${e.t}</span>
+      <span class="v ${cls[e.verdict]||"local"}">${e.verdict.toUpperCase()}</span>
+      <span>${e.detail}</span>
+    </div>`).join("");
+}
+$("clearLedger").addEventListener("click",()=>{LEDGER.length=0;renderLedger();});
+
+/* ===================== CHANNEL B ===================== */
+const SAMPLE=`Subject: Salary revision — FY 2026-27
+
+Dear Mr Rajesh Kumar,
+
+Your revised annual compensation is ₹18,40,000 effective 01 April 2026.
+Payments continue to account number 50100234567891 held with HDFC Bank.
+PAN on record: ABCPK1234M
+Registered address: 12-4-89, Kondapur Main Road, Hyderabad 500084
+Contact: rajesh.kumar@example.com / +91 98490 12345
+
+Please confirm receipt within seven working days.`;
+
+const EASY="Summarise the key terms of this letter in three lines.";
+const HARD="Compare this against typical FY26 compensation bands for my role and tell me if I am underpaid.";
+let modeB="easy";
+
+$("sampleB").addEventListener("click",()=>{ $("inputB").value=SAMPLE; modeB="easy"; resetB(); });
+$("hardB").addEventListener("click",()=>{ if(!$("inputB").value.trim()) $("inputB").value=SAMPLE; modeB="hard"; runB(); });
+$("inputB").value=SAMPLE;
+
+function resetB(){
+  $("verdictB").innerHTML=""; $("foundB").innerHTML="";
+  $("outB").textContent="Nothing has been handed back."; $("vaultB").hidden=true; $("answerB").hidden=true;
+}
+
+function esc(s){return s.replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));}
+
+function highlight(text,found){
+  let out="",cur=0;
+  for(const f of found){
+    out+=esc(text.slice(cur,f.start))+`<mark class="pii">${esc(f.value)}</mark>`;
+    cur=f.end;
+  }
+  return out+esc(text.slice(cur));
+}
+function highlightSur(text){
+  return esc(text).replace(/&lt;([A-Z]+_\d+)&gt;|\[BLOCKED\]/g,m=>`<mark class="sur">${m}</mark>`);
+}
+
+async function runB(){
+  const text=$("inputB").value;
+  if(!text.trim()){ return; }
+  const found=classify(text);
+  const {sanitized,vault,blocked}=applyPolicy(text,found);
+
+  /* findings list */
+  const counts={};
+  found.forEach(f=>{counts[f.key]=(counts[f.key]||0)+1;});
+  $("foundB").innerHTML=`<h3>Classified on device</h3>`+
+    (found.length? Object.entries(counts).map(([k,n])=>{
+      const r=POLICY.find(p=>p.key===k)||{label:k};
+      return `<div class="finding"><div class="ft">
+        <span class="name">${r.label}</span>
+        <span class="code">${n} found · ${policyFor(k)}</span>
+      </div></div>`;
+    }).join("") : `<p class="empty">Nothing sensitive detected.</p>`);
+
+  /* highlight the original */
+  $("inputB").setAttribute("data-h","1");
+
+  if(modeB==="easy"){
+    /* local answer — nothing crosses */
+    $("verdictB").innerHTML=`<div class="verdict local">
+      <div><div class="big">Answered on the device</div>
+      <div class="sm">The local model handled this. Nothing needed to leave — not even a surrogate.</div></div>
+      <div class="mono" style="color:var(--cleared)">nothing to send</div></div>`;
+    $("outB").textContent="Nothing has been handed back.";
+    $("answerB").hidden=false;
+    $("answerBody").textContent=
+`Compensation revised to ₹18,40,000 per year, effective 1 April 2026.
+Payment continues to the existing HDFC account on file.
+Confirmation requested within seven working days.`;
+    $("vaultB").hidden=true;
+    log("held locally","B",`${found.length} sensitive item(s) classified; local model answered, nothing transmitted`);
+  } else {
+    /* handed back — nothing is sent by Parda */
+    $("verdictB").innerHTML=`<div class="verdict escalate">
+      <div><div class="big">Handed back sanitized</div>
+      <div class="sm">The local model could not answer this alone, so Parda prepared a safe version for your clipboard. It did not send it — it has no way to.</div></div>
+      <div class="mono" style="color:var(--held)">${vault.length} item(s) withheld</div></div>`;
+    $("outB").innerHTML=highlightSur(sanitized+"\n\n"+HARD);
+    $("vaultB").hidden=false;
+    $("vaultBody").innerHTML=vault.map(v=>
+      `<span class="mono">${esc(v.tok)}</span>  →  <mark class="pii">${esc(v.real)}</mark>`).join("\n");
+    $("answerB").hidden=false;
+    $("answerBody").innerHTML=
+`If you paste that into any outside model and bring the reply back,
+Parda re-inserts the real values locally:
+
+"<mark class="sur">&lt;AMOUNT_1&gt;</mark> sits at the upper end of the band for this role."
+
+reads back to you as:
+
+"<mark class="pii">₹18,40,000</mark> sits at the upper end of the band for this role."`;
+    log("handed back","B",
+      `${vault.length} item(s) substituted or blocked; sanitized text placed on clipboard, nothing transmitted`);
+  }
+  modeB="easy";
+}
+$("runB").addEventListener("click",runB);
+
+/* ===================== CHANNEL A ===================== */
+const BASE_CART=[
+  {id:"item",  label:"Cotton kurta, size M",              amt:1299, checked:true,  dark:null, locked:true},
+  {id:"ship",  label:"Standard delivery",                  amt:0,    checked:true,  dark:null, locked:true},
+  {id:"don",   label:"Round up and donate to a cause",     amt:10,   checked:true,  dark:"basket_sneaking"},
+  {id:"prot",  label:"Purchase protection plan",           amt:149,  checked:true,  dark:"basket_sneaking"},
+  {id:"prime", label:"Start a 30-day trial (auto-renews at ₹299/mo)", amt:0, checked:true, dark:"subscription_trap"},
+  {id:"fee",   label:"Handling fee",                       amt:49,   checked:true,  dark:"drip_pricing", locked:true}
+];
+let cart=JSON.parse(JSON.stringify(BASE_CART));
+
+const PATTERNS={
+  basket_sneaking:{name:"Basket sneaking",code:"CCPA 1",why:"An item you did not choose was added to your cart with the box already ticked."},
+  subscription_trap:{name:"Subscription trap",code:"CCPA 3",why:"A free trial is pre-enrolled and converts to a recurring charge unless you act."},
+  drip_pricing:{name:"Drip pricing",code:"CCPA 6",why:"A charge revealed only at the final step, after you committed to the purchase."},
+  false_urgency:{name:"False urgency",code:"CCPA 2",why:"A countdown or scarcity claim engineered to stop you from thinking."},
+  confirm_shaming:{name:"Confirm shaming",code:"CCPA 4",why:"Declining is worded to make you feel guilty."}
+};
+
+function renderCart(){
+  const total=cart.filter(i=>i.checked).reduce((s,i)=>s+i.amt,0);
+  $("cart").innerHTML=cart.map(i=>`
+    <div class="li ${i.dark&&i.checked?"sneak":""}">
+      <label class="lbl">
+        <input type="checkbox" data-id="${i.id}" ${i.checked?"checked":""} ${i.locked?"disabled":""}>
+        <span>${i.label}</span>
+      </label>
+      <span class="amt">${i.amt?"₹"+i.amt.toLocaleString("en-IN"):"Free"}</span>
+    </div>`).join("")
+    +`<div class="total"><span>Total payable</span><span class="amt">₹${total.toLocaleString("en-IN")}</span></div>
+      <div class="urgency">Only 2 left — offer ends in 04:58</div>
+      <div class="guilt">No thanks, I don't care about supporting local artisans</div>`;
+  $("cart").querySelectorAll("input[data-id]").forEach(cb=>{
+    cb.addEventListener("change",()=>{
+      cart.find(i=>i.id===cb.dataset.id).checked=cb.checked;
+      renderCart();
+    });
+  });
+}
+
+function scanA(){
+  const findings=[];
+  cart.forEach(i=>{ if(i.dark&&i.checked) findings.push({...PATTERNS[i.dark],id:i.id,cost:i.amt,recurring:i.id==="prime"?299:0,locked:i.locked}); });
+  findings.push({...PATTERNS.false_urgency,id:"urg",cost:0});
+  findings.push({...PATTERNS.confirm_shaming,id:"guilt",cost:0});
+
+  const recoverable=findings.filter(f=>!f.locked).reduce((s,f)=>s+f.cost,0);
+  const recurring=findings.reduce((s,f)=>s+(f.recurring||0),0);
+
+  $("verdictA").innerHTML=`<div class="verdict escalate">
+    <div><div class="big">${findings.length} dark patterns on this screen</div>
+    <div class="sm">₹${recoverable} recoverable now${recurring?`, plus ₹${recurring}/month you did not agree to`:""}. Parda will not tap Pay for you.</div></div>
+    <div class="mono" style="color:var(--held)">policy: flag</div></div>`;
+
+  $("foundA").innerHTML=findings.map(f=>`
+    <div class="finding" id="f-${f.id}">
+      <div class="ft">
+        <span class="name">${f.name}</span>
+        <span class="code">${f.code}</span>
+      </div>
+      <div class="why">${f.why}</div>
+      <div class="ft" style="margin-top:7px">
+        <span class="cost">${f.cost?"₹"+f.cost:(f.recurring?"₹"+f.recurring+"/mo":"no direct cost")}</span>
+        ${f.locked||(!f.cost&&!f.recurring)
+          ? `<span class="code">${f.locked?"cannot be removed — disclosed only":"advisory"}</span>`
+          : `<button class="mini" data-fix="${f.id}">Fix this</button>`}
+      </div>
+    </div>`).join("");
+
+  $("foundA").querySelectorAll("button[data-fix]").forEach(b=>{
+    b.addEventListener("click",()=>{
+      const item=cart.find(i=>i.id===b.dataset.fix);
+      item.checked=false;
+      renderCart();
+      const card=$("f-"+b.dataset.fix);
+      card.classList.add("fixed");
+      b.replaceWith(Object.assign(document.createElement("span"),{className:"code",textContent:"removed"}));
+      log("fixed","A",`${PATTERNS[item.dark].name} removed — ₹${item.amt||299} not charged`);
+    });
+  });
+
+  log("blocked","A",`${findings.length} dark patterns identified; ₹${recoverable} flagged as recoverable`);
+}
+$("runA").addEventListener("click",scanA);
+$("resetA").addEventListener("click",()=>{
+  cart=JSON.parse(JSON.stringify(BASE_CART));
+  renderCart(); $("verdictA").innerHTML="";
+  $("foundA").innerHTML='<p class="empty">Scan the screen to see what it is doing to you.</p>';
+});
+
+/* ===================== TABS ===================== */
+document.querySelectorAll(".tab").forEach(t=>{
+  t.addEventListener("click",()=>{
+    document.querySelectorAll(".tab").forEach(x=>x.setAttribute("aria-selected",String(x===t)));
+    $("ch-b").hidden = t.id!=="tab-b";
+    $("ch-a").hidden = t.id!=="tab-a";
+  });
+});
+
+renderPolicy(); renderCart(); renderLedger();
+</script>
+</body>
+</html>
