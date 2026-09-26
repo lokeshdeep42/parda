@@ -92,21 +92,18 @@ class DemoCheckoutActivity : Activity() {
         }
     }
 
-    override fun onStart() {
-        super.onStart()
-        started++
-    }
-
     override fun onResume() {
         super.onResume()
+        resumed++
         // The window-opened event can reach the shield before this screen counts as visible,
         // and a cart without a countdown sends no more events: announce it once it is up.
         window.decorView.post { window.decorView.sendAccessibilityEvent(AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED) }
     }
 
-    override fun onStop() {
-        started--
-        super.onStop()
+    /** Paused under Parda's own sheet: from here the shield must not read the screen, or it reads the sheet. */
+    override fun onPause() {
+        resumed--
+        super.onPause()
     }
 
     override fun onDestroy() {
@@ -159,13 +156,13 @@ class DemoCheckoutActivity : Activity() {
         private val CLOCK = Regex("""(\d{2}):(\d{2})""")
 
         /**
-         * Demo carts on screen. A count, not a flag: when one cart replaces another, the new one
-         * starts before the old one stops.
+         * Demo carts in front. A count, not a flag, so a cart replacing another never leaves it
+         * wrong; Android pauses the old one before resuming the new.
          */
         @Volatile
-        private var started = 0
+        private var resumed = 0
 
-        /** Read by the service, which runs in this process. */
-        val visible: Boolean get() = started > 0
+        /** Read by the service, which runs in this process. False while Parda's sheet covers the cart. */
+        val visible: Boolean get() = resumed > 0
     }
 }

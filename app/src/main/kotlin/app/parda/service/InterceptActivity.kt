@@ -81,6 +81,23 @@ class InterceptActivity : ComponentActivity() {
         InterceptState.current.value?.let { intercept = it }
     }
 
+    override fun onResume() {
+        super.onResume()
+        onScreen = true
+    }
+
+    override fun onPause() {
+        onScreen = false
+        super.onPause()
+    }
+
+    companion object {
+        /** While the sheet is up the user is deciding: the shield reads nothing, least of all the sheet. */
+        @Volatile
+        var onScreen = false
+            private set
+    }
+
     private fun remove(intercept: Intercept, approved: List<Finding>) {
         val service = CheckoutWatchService.instance
         if (approved.isNotEmpty() && service != null) {

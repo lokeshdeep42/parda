@@ -24,6 +24,7 @@ import app.parda.core.checkout.CheckoutScan
 import app.parda.core.checkout.DarkPatternScanner
 import app.parda.core.checkout.Finding
 import app.parda.core.checkout.Money
+import app.parda.core.checkout.ScreenNode
 import app.parda.core.ledger.Channel
 import app.parda.core.ledger.Verdict
 import app.parda.store
@@ -60,6 +61,7 @@ class CheckoutWatchService : AccessibilityService() {
     }
 
     private fun inspect(pkg: String) {
+        if (InterceptActivity.onScreen) return
         val root = rootInActiveWindow ?: return
         if (root.packageName?.toString() != pkg) return
         if (pkg == packageName && !DemoCheckoutActivity.visible) return
@@ -73,14 +75,19 @@ class CheckoutWatchService : AccessibilityService() {
         }
         val now = System.currentTimeMillis()
         val seen = handled.getOrPut(pkg) { HashSet() }
+        val unticked = seenUnticked.getOrPut(pkg) { HashSet() }
         if (!scan.isCheckout) {
             // A half-drawn screen during a transition can look like "not a checkout". Only
             // forget what was handled once the user has really been away for a while.
-            if (now - (lastCheckoutAt[pkg] ?: 0L) > FORGET_AFTER_MS) seen.clear()
+            if (now - (lastCheckoutAt[pkg] ?: 0L) > FORGET_AFTER_MS) { seen.clear(); unticked.clear() }
             return
         }
         lastCheckoutAt[pkg] = now
-        val fresh = scan.findings.filter { it.key !in seen }
+        // A box seen empty on this checkout and ticked later was ticked by the user: their choice.
+        val chosen = unticked.toSet()
+        fun collect(n: ScreenNode) { if (n.checkable && !n.checked) unticked += n.label.trim(); n.children.forEach(::collect) }
+        collect(snapshot)
+        val fresh = scan.findings.filter { it.key !in seen && !(it.nodeId != null && it.evidence in chosen) }
         if (fresh.isEmpty()) return
         seen += fresh.map { it.key }
 
@@ -203,6 +210,9 @@ class CheckoutWatchService : AccessibilityService() {
          */
         private val handled = HashMap<String, MutableSet<String>>()
         private val lastCheckoutAt = HashMap<String, Long>()
+
+        /** Labels of boxes seen unticked on the current checkout, per app. */
+        private val seenUnticked = HashMap<String, MutableSet<String>>()
         private const val AFTER_SHEET_MS = 450L
         private const val NOTIFICATION_ID = 1
 
@@ -217,6 +227,7 @@ class CheckoutWatchService : AccessibilityService() {
         fun forget(pkg: String) {
             handled.remove(pkg)
             lastCheckoutAt.remove(pkg)
+            seenUnticked.remove(pkg)
         }
 
         fun isEnabled(context: Context): Boolean {
