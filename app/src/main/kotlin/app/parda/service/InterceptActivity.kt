@@ -2,6 +2,15 @@ package app.parda.service
 
 import android.content.Intent
 import android.os.Bundle
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.rememberDraggableState
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.Orientation
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -140,9 +149,17 @@ private fun Sheet(
     val findings = intercept.plan.ask
     val remove = remember { mutableStateMapOf<String, Boolean>().apply { findings.filter { it.fixable }.forEach { put(it.key, true) } } }
     // Off until the user ticks it: Parda offers to remember, it never decides to.
-    val learn = remember { mutableStateMapOf<DarkPatternKind, Boolean>() }
+    var learn by remember { mutableStateOf(false) }
     val saving = findings.filter { it.fixable && remove[it.key] == true }.sumOf { it.cost }
     val monthly = findings.filter { it.fixable && remove[it.key] == true }.sumOf { it.recurring }
+
+    // Resizable: it opens at part of the screen so the store stays visible behind it; the
+    // grabber drags it between a third and nearly all of the screen, or a tap toggles it.
+    val screen = LocalConfiguration.current.screenHeightDp.dp
+    val (low, mid, high) = Triple(screen * 0.35f, screen * 0.6f, screen * 0.92f)
+    var height by remember { mutableStateOf(mid) }
+    val density = LocalDensity.current
+    val drag = rememberDraggableState { delta -> height = (height - with(density) { delta.toDp() }).coerceIn(low, high) }
 
     Box(Modifier.fillMaxSize().background(Color(0x471E222C)), contentAlignment = Alignment.BottomCenter) {
         Column(
@@ -150,14 +167,24 @@ private fun Sheet(
                 .navigationBarsPadding()
                 .padding(10.dp)
                 .fillMaxWidth()
+                .heightIn(max = height)
                 .clip(RoundedCornerShape(36.dp))
                 .background(Color.White.copy(alpha = 0.94f))
                 .border(1.dp, Color.White, RoundedCornerShape(36.dp))
-                .verticalScroll(rememberScrollState())
-                .padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+                .padding(start = 20.dp, end = 20.dp, bottom = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Box(Modifier.align(Alignment.CenterHorizontally).width(40.dp).height(5.dp).clip(CircleShape).background(Frost.Ink.copy(alpha = 0.2f)))
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(28.dp)
+                    .draggable(drag, Orientation.Vertical)
+                    .clickable(onClickLabel = if (height < high) "Expand" else "Shrink") { height = if (height < high) high else mid }
+                    .semantics { contentDescription = "Resize the sheet" },
+                contentAlignment = Alignment.Center,
+            ) {
+                Box(Modifier.width(40.dp).height(5.dp).clip(CircleShape).background(Frost.Ink.copy(alpha = 0.25f)))
+            }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Box(Modifier.size(48.dp).clip(RoundedCornerShape(16.dp)).background(Frost.Night), contentAlignment = Alignment.Center) {
                     StrokeIcon(Icons.Shield, tint = Color.White, size = 24.dp)
@@ -171,6 +198,11 @@ private fun Sheet(
                 }
             }
 
+            // Only the middle scrolls; the header above and the two buttons below stay in view.
+            Column(
+                Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 findings.forEach { f -> FindingRow(f, remove[f.key] == true) { remove[f.key] = it } }
             }
@@ -193,27 +225,28 @@ private fun Sheet(
                 }
             }
 
-            offers.forEach { kind ->
-                val on = learn[kind] == true
+            if (offers.isNotEmpty()) {
+                // One row for everything Parda could remember, not one per kind.
                 Row(
                     Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(Frost.GlassStrong)
-                        .toggleable(on, role = Role.Checkbox) { learn[kind] = it }
+                        .toggleable(learn, role = Role.Checkbox) { learn = it }
                         .padding(horizontal = 14.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     Text(
-                        "You've removed ${kind.label.lowercase()} here before. Next time in ${intercept.appLabel}, remove them without asking.",
+                        "Next time in ${intercept.appLabel}, remove ${offers.joinToString(" and ") { it.label.lowercase() }} without asking",
                         style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f),
                     )
-                    Checkbox(checked = on, onCheckedChange = null, colors = CheckboxDefaults.colors(checkedColor = Frost.Night))
+                    Checkbox(checked = learn, onCheckedChange = null, colors = CheckboxDefaults.colors(checkedColor = Frost.Night))
                 }
+            }
             }
 
             val approved = findings.filter { it.fixable && remove[it.key] == true }
             PrimaryButton(
                 if (approved.isEmpty()) "Continue" else "Remove add-ons & continue",
-                onClick = { onRemove(approved, learn.filterValues { it }.keys) },
+                onClick = { onRemove(approved, if (learn) offers.toSet() else emptySet()) },
             )
             QuietButton("Keep everything", onClick = onKeep)
         }

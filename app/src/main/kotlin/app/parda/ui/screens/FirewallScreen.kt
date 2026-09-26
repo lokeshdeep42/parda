@@ -104,7 +104,11 @@ fun FirewallScreen(policy: Policy, onPolicy: (Policy) -> Unit) {
                     RuleRow(
                         dot = if (action == DisclosureAction.BLOCK) Frost.AlertInk else Frost.Accent,
                         title = cat.label,
-                        hint = "Shown to others as <${cat.tokenPrefix}_1>",
+                        hint = if (cat == DataCategory.HEALTH_CONDITION) {
+                            "Diagnoses. Let through so a report can be explained; mask them before sending one to an employer or insurer"
+                        } else {
+                            "Shown to others as <${cat.tokenPrefix}_1>"
+                        },
                         action = action.label,
                         strong = action == DisclosureAction.BLOCK,
                         last = i == DataCategory.entries.lastIndex,

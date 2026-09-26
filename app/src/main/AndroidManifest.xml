@@ -102,6 +102,12 @@
             </intent-filter>
         </service>
 
+        <!-- "Parda missed something?": a report of a recent screen, masked, shared by the user. -->
+        <activity
+            android:name=".ReportMissActivity"
+            android:exported="false"
+            android:label="Report a miss" />
+
         <activity
             android:name=".service.InterceptActivity"
             android:exported="false"

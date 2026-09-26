@@ -69,6 +69,7 @@ class CheckoutWatchService : AccessibilityService() {
 
         val snapshot = ScreenSnapshot.capture(root)
         val scan = store.scanner.scan(snapshot)
+        remember(pkg, snapshot, scan)
         if (debuggable && scan.isCheckout) {
             // Debug builds only: what the shield read and concluded, for tuning against real apps.
             Log.i(TAG, "checkout in $pkg\n" + ScreenSnapshot.dump(snapshot))
@@ -121,6 +122,21 @@ class CheckoutWatchService : AccessibilityService() {
                 )
             }
             plan.shouldNotify -> notify(app, plan.flag, saved)
+        }
+    }
+
+    /**
+     * Keeps the last few screens that showed prices, in memory only, so the user can report one
+     * Parda got wrong. A screen of the same app replaces the previous one.
+     */
+    private fun remember(pkg: String, snapshot: ScreenNode, scan: CheckoutScan) {
+        val dump = ScreenSnapshot.dump(snapshot)
+        if (!scan.isCheckout && Money.oneOffAmounts(dump).size < 2) return
+        val seen = Seen(pkg, appLabel(pkg), System.currentTimeMillis(), dump.take(MAX_DUMP), scan.isCheckout, scan.findings.map { "${it.kind.label}: ${it.evidence}" })
+        synchronized(recent) {
+            recent.removeAll { it.app == pkg }
+            recent.addFirst(seen)
+            while (recent.size > MAX_RECENT) recent.removeLast()
         }
     }
 
@@ -239,6 +255,16 @@ class CheckoutWatchService : AccessibilityService() {
         @Volatile
         var lastEventAt = 0L
             private set
+
+        /** A screen with prices the shield saw, for "Report a miss". Never written to disk. */
+        data class Seen(val app: String, val label: String, val at: Long, val dump: String, val checkout: Boolean, val findings: List<String>)
+
+        private val recent = ArrayDeque<Seen>()
+        private const val MAX_RECENT = 5
+        private const val MAX_DUMP = 30_000
+
+        /** Newest first. */
+        val recentScreens: List<Seen> get() = synchronized(recent) { recent.toList() }
 
         /** Bound by the system right now. Switched on in Settings is not enough: OEMs stop services. */
         val running: Boolean get() = instance != null

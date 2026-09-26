@@ -60,6 +60,7 @@ fun HomeScreen(
     onNotifications: () -> Unit,
     onOpenLedger: () -> Unit,
     onTryDemo: () -> Unit,
+    onReportMiss: () -> Unit,
 ) {
     val serviceOn = shield.enabled && shield.running
     ScreenColumn {
@@ -87,6 +88,13 @@ fun HomeScreen(
                 }
             }
             ShieldNote(shield, onBackgroundSettings, onNotifications)
+            if (serviceOn) {
+                Text(
+                    "Parda missed something? Report it",
+                    style = MaterialTheme.typography.bodyMedium, color = Frost.Ink2,
+                    modifier = Modifier.clickable(role = Role.Button, onClick = onReportMiss),
+                )
+            }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Stat("${totals.patternsCaught}", "Dark patterns caught", Modifier.weight(1f))
                 Stat(Money.format(totals.savedPaise), "Saved", Modifier.weight(1f))

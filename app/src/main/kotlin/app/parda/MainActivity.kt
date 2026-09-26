@@ -132,6 +132,7 @@ class MainActivity : ComponentActivity() {
                     onNotifications = ::requestNotifications,
                     onOpenLedger = { tab = TAB_LEDGER },
                     onTryDemo = { startActivity(Intent(this@MainActivity, DemoStoresActivity::class.java)) },
+                    onReportMiss = { startActivity(Intent(this@MainActivity, ReportMissActivity::class.java)) },
                 )
                 TAB_FIREWALL -> FirewallScreen(policy, store::setPolicy)
                 TAB_AIRLOCK -> AirlockScreen(sharedText, sharedImage)
