@@ -7,6 +7,7 @@ import android.os.Process
 import app.parda.core.agent.DisclosureGate
 import app.parda.core.agent.ModelAgent
 import app.parda.core.agent.RuleBasedAgent
+import app.parda.core.agent.TextEngine
 import app.parda.core.checkout.DarkPatternScanner
 import app.parda.core.policy.DarkPatternKind
 import app.parda.core.checkout.RemovalHistory
@@ -22,6 +23,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.serialization.json.Json
 import java.io.File
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.ScheduledFuture
+import java.util.concurrent.Executors
 
 /**
  * Everything Parda keeps, all of it in app-private storage on this device: the policy, the
@@ -45,12 +49,63 @@ class PardaStore(context: Context) {
     private val contentResolver = context.contentResolver
 
     @Volatile private var engine: LlamaEngine? = null
+    /** The model file behind [engine], or the one resting while [engine] is freed. */
+    @Volatile private var modelFile: File? = null
     private val _model = MutableStateFlow<ModelStatus>(ModelStatus.Missing)
     val model: StateFlow<ModelStatus> = _model.asStateFlow()
 
-    /** The on-device model when one is loaded; the rule-based agent otherwise. */
+    /** Puts the model to rest after [IDLE_MS] unused; one thread, so rests never overlap. */
+    private val idle = Executors.newSingleThreadScheduledExecutor { r -> Thread(r, "parda-model-idle").apply { isDaemon = true } }
+    private var restTask: ScheduledFuture<*>? = null
+
+    /**
+     * The model as the agent sees it: always there. A resting model is loaded again on the first
+     * request (about a second for Hammer Q4_0), and every request pushes the next rest back.
+     */
+    private val onDemand = TextEngine { prompt, grammar, maxTokens, onToken ->
+        val awake = wake() ?: error("the model could not be loaded")
+        try {
+            awake.complete(prompt, grammar, maxTokens, onToken)
+        } finally {
+            scheduleRest()
+        }
+    }
+
+    /** The on-device model when there is one, loaded or resting; the rule-based agent otherwise. */
     val gate: DisclosureGate
-        get() = DisclosureGate(engine?.let(::ModelAgent) ?: RuleBasedAgent(), sanitizer = sanitizer)
+        get() = DisclosureGate(if (modelFile != null) ModelAgent(onDemand) else RuleBasedAgent(), sanitizer = sanitizer)
+
+    @Synchronized
+    private fun wake(): LlamaEngine? {
+        engine?.let { return it }
+        val file = modelFile ?: return null
+        _model.value = ModelStatus.Loading(file.nameWithoutExtension)
+        val started = System.currentTimeMillis()
+        return runCatching { LlamaEngine.load(nativeLibDir, file) }
+            .onSuccess { engine = it; _model.value = ModelStatus.Ready(it.modelName, System.currentTimeMillis() - started) }
+            .onFailure { _model.value = ModelStatus.Failed(file.nameWithoutExtension, it.message ?: "load failed") }
+            .getOrNull()
+    }
+
+    @Synchronized
+    private fun scheduleRest() {
+        restTask?.cancel(false)
+        restTask = idle.schedule({ restModel() }, IDLE_MS, TimeUnit.MILLISECONDS)
+    }
+
+    /**
+     * Frees the model's memory (a gigabyte or more) until it is needed again. Waits for a request
+     * that is running to finish, since the engine closes under the same lock it answers under.
+     */
+    fun restModel() {
+        val resting = synchronized(this) {
+            val e = engine ?: return
+            engine = null
+            e
+        }
+        resting.close()
+        _model.value = ModelStatus.Resting(resting.modelName)
+    }
 
     private val _policy = MutableStateFlow(loadPolicy())
     val policy: StateFlow<Policy> = _policy.asStateFlow()
@@ -143,7 +198,9 @@ class PardaStore(context: Context) {
             .onSuccess { loaded ->
                 engine?.close()
                 engine = loaded
+                modelFile = file
                 _model.value = ModelStatus.Ready(loaded.modelName, System.currentTimeMillis() - started)
+                scheduleRest()
             }
             .onFailure { _model.value = ModelStatus.Failed(file.nameWithoutExtension, it.message ?: "load failed") }
     }
@@ -179,6 +236,9 @@ class PardaStore(context: Context) {
         const val KEY_MODEL = "model"
         const val KEY_REMOVALS = "removals"
 
+        /** Unused this long, the model is put to rest. */
+        const val IDLE_MS = 5 * 60 * 1000L
+
         /**
          * Measured on an iQOO (SM8850) with ModelBench: Hammer Q4_0 plans best for its speed
          * (10/12, 4.3 s, 39 tok/s); Qwen2.5 3B plans perfectly but takes 12 s; Gemma 3 1B
@@ -194,5 +254,7 @@ sealed interface ModelStatus {
     data object Missing : ModelStatus
     data class Loading(val name: String) : ModelStatus
     data class Ready(val name: String, val loadMillis: Long) : ModelStatus
+    /** Unloaded after sitting unused, to give its memory back; loads again on the next request. */
+    data class Resting(val name: String) : ModelStatus
     data class Failed(val name: String, val reason: String) : ModelStatus
 }
