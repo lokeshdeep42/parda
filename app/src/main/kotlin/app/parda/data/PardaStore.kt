@@ -83,26 +83,22 @@ class PardaStore(context: Context) {
         _entries.value = ledger.all
     }
 
-    /** Every .gguf on the phone, best first: the user's pick, then the benchmark's ranking. */
-    fun installedModels(): List<File> {
-        val all = listOfNotNull(importDir, pushDir)
+    /**
+     * Every .gguf on the phone in the benchmark's order, best first. The order never depends on
+     * which one is loaded, so a list of them stays put while the user picks.
+     */
+    fun installedModels(): List<File> =
+        listOfNotNull(importDir, pushDir)
             .flatMap { it.listFiles { f -> f.extension.equals("gguf", ignoreCase = true) }.orEmpty().toList() }
             .distinctBy { it.name }
-        val chosen = prefs.getString(KEY_MODEL, null)
-        return all.sortedWith(
-            compareBy<File> { it.nameWithoutExtension != chosen }
-                .thenBy { f -> RANKED.indexOfFirst { it in f.name.lowercase() }.let { if (it < 0) RANKED.size else it } }
-                .thenByDescending { it.lastModified() },
-        )
-    }
+            .sortedWith(
+                compareBy<File> { f -> RANKED.indexOfFirst { it in f.name.lowercase() }.let { if (it < 0) RANKED.size else it } }
+                    .thenByDescending { it.lastModified() },
+            )
 
-    /** Loads the next installed model and remembers it. Blocking: call off the main thread. */
-    fun switchModel() {
-        val models = installedModels()
-        if (models.size < 2) return
-        val current = (_model.value as? ModelStatus.Ready)?.name
-        val next = models[(models.indexOfFirst { it.nameWithoutExtension == current } + 1) % models.size]
-        prefs.edit().putString(KEY_MODEL, next.nameWithoutExtension).apply()
+    /** Loads [name] and remembers it. Blocking: call off the main thread. */
+    fun useModel(name: String) {
+        prefs.edit().putString(KEY_MODEL, name).apply()
         loadModel()
     }
 
@@ -112,7 +108,10 @@ class PardaStore(context: Context) {
      */
     @Synchronized
     fun loadModel() {
-        val file = installedModels().firstOrNull() ?: run { _model.value = ModelStatus.Missing; return }
+        val models = installedModels()
+        val chosen = prefs.getString(KEY_MODEL, null)
+        val file = models.firstOrNull { it.nameWithoutExtension == chosen } ?: models.firstOrNull()
+            ?: run { _model.value = ModelStatus.Missing; return }
         if ((_model.value as? ModelStatus.Ready)?.name == file.nameWithoutExtension) return
 
         _model.value = ModelStatus.Loading(file.nameWithoutExtension)

@@ -1,5 +1,8 @@
 package app.parda.ui.screens
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.DropdownMenu
 import androidx.compose.foundation.horizontalScroll
 import app.parda.core.document.SuggestedQuestions
 import app.parda.core.agent.Planner
@@ -167,11 +170,11 @@ fun AirlockScreen(initialText: String?, initialImage: Uri? = null) {
             Text("Mask it before you share it", style = MaterialTheme.typography.bodyLarge, color = Frost.Ink2)
         }
 
-        val installed = remember(model) { store.installedModels().size }
+        val installed = remember(model) { store.installedModels().map { it.nameWithoutExtension to it.length() } }
         ModelCard(
             model, installed,
             onImport = { pickModel.launch(arrayOf("*/*")) },
-            onSwitch = { scope.launch(Dispatchers.IO) { store.switchModel() } },
+            onPick = { name -> scope.launch(Dispatchers.IO) { store.useModel(name) } },
         )
 
         image?.let { img ->
@@ -380,14 +383,15 @@ private fun ImageCard(img: ImageAirlock.Result, name: String, onClose: () -> Uni
 
 /** Which planner is on duty. The model file only ever arrives by hand: nothing is downloaded. */
 @Composable
-private fun ModelCard(model: ModelStatus, installed: Int, onImport: () -> Unit, onSwitch: () -> Unit) {
+private fun ModelCard(model: ModelStatus, installed: List<Pair<String, Long>>, onImport: () -> Unit, onPick: (String) -> Unit) {
+    var menu by remember { mutableStateOf(false) }
     GlassCard(padding = 16.dp) {
         SectionLabel("Local model")
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 val (title, detail) = when (model) {
                     is ModelStatus.Ready -> model.name to "Running on this phone's CPU · loaded in ${model.loadMillis} ms" +
-                        if (installed > 1) " · $installed models installed" else ""
+                        if (installed.size > 1) " · ${installed.size} models installed" else ""
                     is ModelStatus.Loading -> model.name to "Loading…"
                     is ModelStatus.Failed -> model.name to "Could not load: ${model.reason}. Using the rule-based agent."
                     ModelStatus.Missing -> "Rule-based agent" to "Import a .gguf (e.g. Hammer2.1-1.5B Q4) to plan with a local LLM."
@@ -397,8 +401,20 @@ private fun ModelCard(model: ModelStatus, installed: Int, onImport: () -> Unit, 
             }
             if (model is ModelStatus.Missing || model is ModelStatus.Failed) {
                 Pill("Import", strong = true, onClick = onImport)
-            } else if (model is ModelStatus.Ready && installed > 1) {
-                Pill("Switch", onClick = onSwitch)
+            } else if (model is ModelStatus.Ready && installed.size > 1) {
+                Box {
+                    Pill("Switch", onClick = { menu = true })
+                    // Every installed model, in the benchmark's order; the one running is ticked.
+                    DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                        installed.forEach { (name, bytes) ->
+                            DropdownMenuItem(
+                                text = { Text((if (name == model.name) "✓ " else "") + name + " · " + "%.1f GB".format(bytes / 1e9)) },
+                                onClick = { menu = false; if (name != model.name) onPick(name) },
+                            )
+                        }
+                        DropdownMenuItem(text = { Text("Import another .gguf") }, onClick = { menu = false; onImport() })
+                    }
+                }
             }
         }
     }

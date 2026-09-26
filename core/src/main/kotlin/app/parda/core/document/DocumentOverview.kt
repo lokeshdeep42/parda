@@ -96,6 +96,7 @@ object DocumentOverview {
             DataCategory.EMAIL -> if (one) "email address" else "email addresses"
             DataCategory.ADDRESS -> if (one) "address" else "addresses"
             DataCategory.DATE_OF_BIRTH -> if (one) "date of birth" else "dates of birth"
+            DataCategory.HEALTH_ID -> if (one) "health record ID" else "health record IDs"
         }
     }
 

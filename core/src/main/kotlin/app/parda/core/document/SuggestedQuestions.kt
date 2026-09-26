@@ -30,6 +30,19 @@ object SuggestedQuestions {
         fun summarise(request: String) = q("Summarise", request, "सारांश", "इसका सारांश दें।")
 
         return when {
+            // A medical report: explaining results needs outside knowledge, so it is handed back
+            // with everything that identifies the patient masked and the results left in.
+            DataCategory.HEALTH_ID in found || has(
+                lower, "patient", "haemoglobin", "hemoglobin", "reference range", "diagnosis", "prescription",
+                "lab report", "test report", "मरीज", "रोगी", "जाँच रिपोर्ट",
+            ) -> listOf(
+                summarise("Summarise this report."),
+                list,
+                q(
+                    "Explain my results", "Compare these results with normal ranges and tell me what they mean.",
+                    "रिपोर्ट समझाएँ", "इन परिणामों की सामान्य सीमा से तुलना करें और बताएँ इनका क्या मतलब है।",
+                ),
+            )
             has(lower, "statement", "opening balance", "closing balance", "debit", "credit", "withdrawal", "खाता विवरण", "शेष राशि", "निकासी") -> listOf(
                 summarise("Summarise this statement."),
                 list,

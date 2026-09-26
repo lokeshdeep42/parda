@@ -153,7 +153,8 @@ object Detectors {
         DataCategory.MONEY_AMOUNT, "Amount",
         Regex(
             """(?:₹|\bRs\.?|\bINR)\s?\d[\d,]*(?:\.\d{1,2})?(?:\s?(?:lakhs?|crores?|cr|L|k)\b)?""" +
-                """|\b\d+(?:\.\d+)?\s?(?:LPA|lakhs?|crores?)\b""" +
+                // Not a lab value: "2.1 lakh/cumm" is a platelet count, not money.
+                """|\b\d+(?:\.\d+)?\s?(?:LPA|lakhs?|crores?)\b(?!\s*/)""" +
                 // Hindi: "रु. 24,000", "18,40,000 रुपये", "18 लाख"
                 """|(?<![\u0900-\u097F])(?:रु\.?|रुपये)[ \t]?\d[\d,]*(?:\.\d{1,2})?""" +
                 """|(?<![\d,])\d[\d,]*(?:\.\d{1,2})?[ \t]?(?:रुपये|रुपए|लाख|करोड़)""",
@@ -169,7 +170,29 @@ object Detectors {
     val NAME_LABELLED = RegexDetector(
         DataCategory.PERSON_NAME, "Name",
         Regex("""(?:\b(?:[Nn]ame|NAME)[ \t]*[:\-][ \t]*|\bDear[ \t]+)(?<v>$NAME)\b"""),
-        accept = { it !in setOf("Sir", "Madam", "Customer", "Team", "User", "Friend", "All") },
+        // "Patient Name : Mrs. Lakshmi" -> the title is not the name; NAME_HONORIFIC takes the name.
+        accept = { it !in setOf("Sir", "Madam", "Customer", "Team", "User", "Friend", "All", "Mr", "Mrs", "Ms", "Dr", "Shri", "Smt") },
+    )
+
+    /** ABHA (Ayushman Bharat Health Account) number: 14 digits, printed 2-4-4-4. */
+    val ABHA_NUMBER = RegexDetector(
+        DataCategory.GOV_ID, "ABHA number",
+        Regex("""(?<![\d-])\d{2}[ -]\d{4}[ -]\d{4}[ -]\d{4}(?![\d-])"""),
+    )
+
+    /** ABHA address, the health ID's handle: "lakshmi.n@abdm". */
+    val ABHA_ADDRESS = RegexDetector(
+        DataCategory.HEALTH_ID, "ABHA address",
+        Regex("""(?i)\b[\w.]+@(?:abdm|sbx)\b"""),
+    )
+
+    /** Hospital and lab record numbers, found by their label; the value must contain a digit. */
+    val RECORD_ID = RegexDetector(
+        DataCategory.HEALTH_ID, "Health record ID",
+        Regex(
+            """(?i)\b(?:UHID|MRN|MR\s?No|CR\s?No|Patient\s?ID|Lab\s?(?:No|ID)|Sample\s?(?:No|ID)|Reg(?:istration)?\.?\s?No|IP\s?No|OP\s?No""" +
+                """|Accession\s?No|Visit\s?(?:No|ID))\.?[ \t]*[:#\-]?[ \t]*(?<v>(?=[A-Z0-9/\-]*\d)[A-Z0-9][A-Z0-9/\-]{3,})""",
+        ),
     )
 
     // Devanagari: letters and vowel signs, without the danda (।) or Devanagari digits. A Hindi
@@ -191,7 +214,7 @@ object Detectors {
     )
 
     val DEFAULT: List<Detector> = listOf(
-        EMAIL, AADHAAR, MASKED_AADHAAR, PAN, CARD, AddressDetector, PHONE, BANK_ACCOUNT,
+        ABHA_ADDRESS, EMAIL, AADHAAR, MASKED_AADHAAR, PAN, ABHA_NUMBER, CARD, AddressDetector, PHONE, RECORD_ID, BANK_ACCOUNT,
         DOB, DOB_HI, MONEY, NAME_HONORIFIC, NAME_LABELLED, NAME_HONORIFIC_HI, NAME_LABELLED_HI,
     )
 }
