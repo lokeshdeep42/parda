@@ -54,9 +54,11 @@ class RuleBasedAgent(private val classifier: Classifier = Classifier()) : LocalA
             "legal", " law", "tax rule", "regulation",
             // Hindi: market, compare, law, average, online, typical households
             "बाज़ार", "बाजार", "तुलना", "कानून", "क़ानून", "औसत", "ऑनलाइन", "आम परिवार",
+            // Telugu: compare, market, law, average, online, typical households
+            "పోల్చ", "మార్కెట్", "చట్ట", "సగటు", "ఆన్‌లైన్", "సాధారణ కుటుంబ",
         ).map { java.text.Normalizer.normalize(it, java.text.Normalizer.Form.NFC) }
-        val SUMMARISE = listOf("summar", "tl;dr", "tldr", "key terms", "key points", "gist", "in short", "main points", "सारांश")
-        val EXTRACT = listOf("extract", "list the", "pull out", "what are the numbers", "find the", "which amounts", "सूची", "निकाल")
+        val SUMMARISE = listOf("summar", "tl;dr", "tldr", "key terms", "key points", "gist", "in short", "main points", "सारांश", "సారాంశం")
+        val EXTRACT = listOf("extract", "list the", "pull out", "what are the numbers", "find the", "which amounts", "सूची", "निकाल", "జాబితా")
         val SKIP_PREFIXES = listOf("subject:", "dear ", "regards", "thanks", "thank you", "sincerely")
     }
 }

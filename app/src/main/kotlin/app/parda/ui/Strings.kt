@@ -108,18 +108,22 @@ val Planner.title: String
     get() = str(if (this == Planner.RULES) R.string.planner_rules else R.string.planner_model)
 
 /**
- * English or Hindi, per app. Android 13+ keeps the choice itself (also under Settings → Apps →
- * Parda → Language); older phones follow the system language.
+ * English, Hindi or Telugu, per app. Android 13+ keeps the choice itself (also under Settings →
+ * Apps → Parda → Language); older phones follow the system language.
  */
 object AppLanguage {
+    /** Each language named in itself, so someone who reads only that one can find it. */
+    val choices = listOf("en" to "English", "hi" to "हिंदी", "te" to "తెలుగు")
+
     val switchable: Boolean get() = Build.VERSION.SDK_INT >= 33
 
-    fun isHindi(context: Context): Boolean = context.resources.configuration.locales[0].language == "hi"
+    /** The language Parda is showing: one of [choices]. */
+    fun current(context: Context): String =
+        context.resources.configuration.locales[0].language.takeIf { code -> choices.any { it.first == code } } ?: "en"
 
-    /** Switches between English and Hindi; Android recreates the screens in the new language. */
-    fun toggle(context: Context) {
+    /** Switches language; Android recreates the screens in it. */
+    fun set(context: Context, code: String) {
         if (Build.VERSION.SDK_INT < 33) return
-        val next = if (isHindi(context)) "en" else "hi"
-        context.getSystemService(LocaleManager::class.java).applicationLocales = LocaleList.forLanguageTags(next)
+        context.getSystemService(LocaleManager::class.java).applicationLocales = LocaleList.forLanguageTags(code)
     }
 }

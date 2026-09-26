@@ -3,8 +3,8 @@ package app.parda.core.checkout
 /** Rupee amounts as whole paise, so arithmetic stays exact. */
 object Money {
     private val AMOUNT = Regex(
-        """(?:₹|\bRs\.?|\bINR|(?<![\u0900-\u097F])रु\.?|रुपये)\s?(\d[\d,]*(?:\.\d{1,2})?)""" +
-            """|(?<![\d,])(\d[\d,]*(?:\.\d{1,2})?)[ \t]?(?:रुपये|रुपए)""" +
+        """(?:₹|\bRs\.?|\bINR|(?<![\u0900-\u097F])रु\.?|रुपये|(?<![\u0C00-\u0C7F])రూ\.?)\s?(\d[\d,]*(?:\.\d{1,2})?)""" +
+            """|(?<![\d,])(\d[\d,]*(?:\.\d{1,2})?)[ \t]?(?:रुपये|रुपए|రూపాయలు)""" +
             // Screen-reader labels spell it out: "price 230 rupees", "Tip 10 rupees".
             """|(?<![\d,.])(\d[\d,]*(?:\.\d{1,2})?)\s?(?:[Rr]upees?|RUPEES?)\b""",
     )

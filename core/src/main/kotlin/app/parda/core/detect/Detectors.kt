@@ -47,7 +47,7 @@ object AddressDetector : Detector {
     override val name = "Address"
     private val pin = Regex("""(?<!\d)[1-9]\d{2}\s?\d{3}(?!\d)""")
     // OCR often reads a colon after Devanagari as the visarga (\u0903), which looks the same.
-    private val label = Regex("""^\s*[A-Za-z\u0900-\u097F][A-Za-z\u0900-\u097F ]{0,30}[:\u0903]\s*""")
+    private val label = Regex("""^\s*[A-Za-z\u0900-\u097F\u0C00-\u0C7F][A-Za-z\u0900-\u097F\u0C00-\u0C7F ]{0,30}[:\u0903\u0C03]\s*""")
 
     override fun find(text: String): List<Detection> {
         val out = mutableListOf<Detection>()
@@ -157,7 +157,10 @@ object Detectors {
                 """|\b\d+(?:\.\d+)?\s?(?:LPA|lakhs?|crores?)\b(?!\s*/)""" +
                 // Hindi: "रु. 24,000", "18,40,000 रुपये", "18 लाख"
                 """|(?<![\u0900-\u097F])(?:रु\.?|रुपये)[ \t]?\d[\d,]*(?:\.\d{1,2})?""" +
-                """|(?<![\d,])\d[\d,]*(?:\.\d{1,2})?[ \t]?(?:रुपये|रुपए|लाख|करोड़)""",
+                """|(?<![\d,])\d[\d,]*(?:\.\d{1,2})?[ \t]?(?:रुपये|रुपए|लाख|करोड़)""" +
+                // Telugu: "రూ. 24,000", "18,40,000 రూపాయలు", "18 లక్షలు"
+                """|(?<![\u0C00-\u0C7F])రూ\.?[ \t]?\d[\d,]*(?:\.\d{1,2})?""" +
+                """|(?<![\d,])\d[\d,]*(?:\.\d{1,2})?[ \t]?(?:రూపాయలు|లక్షలు|లక్ష|కోట్లు)""",
         ),
     )
     private const val CAP = """[A-Z][a-z]+"""
@@ -202,13 +205,14 @@ object Detectors {
     val HEALTH_CONDITION = RegexDetector(
         DataCategory.HEALTH_CONDITION, "Health condition",
         Regex(
-            """(?i)(?:\b(?:(?:provisional |final )?diagnosis|impression|chief complaints?|known case of|k/c/o)[ \t]*[:\-][ \t]*|(?<![\u0900-\u097F])निदान[ \t]*[:\u0903\-][ \t]*)(?<v>[^\n]{3,120})""" +
+            """(?i)(?:\b(?:(?:provisional |final )?diagnosis|impression|chief complaints?|known case of|k/c/o)[ \t]*[:\-][ \t]*|(?<![\u0900-\u097F])निदान[ \t]*[:\u0903\-][ \t]*|(?<![\u0C00-\u0C7F])నిర్ధారణ[ \t]*[:\u0C03\-][ \t]*)(?<v>[^\n]{3,120})""" +
                 """|\b(?:type[ -]?[12] )?diabet(?:es|ic)\b|\bhypertension\b|\bhypo- ?thyroid\w*|\bhyper- ?thyroid\w*|\bthyroid disorder\b""" +
                 """|\bHIV\b|\bAIDS\b|\bhepatitis(?: [ABC])?\b|\btuberculosis\b|\bcancer\b|\bcarcinoma\b|\bmalignan\w+|\btumou?r\b""" +
                 """|\bpregnan(?:t|cy)\b|\ban(?:a)?emi[ac]\b|\basthma\b|\bCOPD\b|\bdepression\b|\banxiety disorder\b|\bbipolar\b|\bschizophreni\w+""" +
                 """|\bepilep\w+|\bdementia\b|\balzheimer\w*|\bparkinson\w*|\bchronic kidney disease\b|\bdialysis\b|\bcirrhosis\b|\bPCO[DS]\b""" +
                 """|\binfertility\b|\bsyphilis\b|\bgonorrh\w+|\bdengue\b|\bmalaria\b|\btyphoid\b|\bADHD\b|\bautism\b""" +
-                """|मधुमेह|उच्च रक्तचाप|कैंसर|गर्भावस्था|एचआईवी|टीबी|अवसाद""",
+                """|मधुमेह|उच्च रक्तचाप|कैंसर|गर्भावस्था|एचआईवी|टीबी|अवसाद""" +
+                """|మధుమేహం|చక్కెర వ్యాధి|అధిక రక్తపోటు|క్యాన్సర్|గర్భవతి|గర్భం|హెచ్ఐవి|క్షయ|డిప్రెషన్""",
         ),
     )
 
@@ -230,9 +234,29 @@ object Detectors {
         Regex("""(?:जन्म[ \t]*(?:तिथि|तारीख)|जन्मतिथि)[ \t]*[:\u0903\-]?[ \t]*(?<v>\d{1,2}[/.\- ]\d{1,2}[/.\- ]\d{2,4})"""),
     )
 
+    // Telugu: a name runs at most three words and stops at a postposition or "గారు"
+    // ("రాజేష్ కుమార్ గారికి" -> "రాజేష్ కుమార్").
+    private const val TELUGU = """[\u0C00-\u0C63\u0C71-\u0C7F]+"""
+    private const val NOT_POSTPOSITION_TE =
+        """(?!(?:కి|కు|ని|ను|గారు|గారికి|గారి|తో|లో|యొక్క|మరియు|కోసం)(?![\u0C00-\u0C7F]))"""
+    private const val NAME_TE = """$TELUGU(?:[ \t]+$NOT_POSTPOSITION_TE$TELUGU){0,2}"""
+    val NAME_HONORIFIC_TE = RegexDetector(
+        DataCategory.PERSON_NAME, "Name",
+        Regex("""(?<![\u0C00-\u0C7F])(?:శ్రీమతి|శ్రీ|కుమారి|డాక్టర్|డా\.?)[ \t]+(?<v>$NAME_TE)"""),
+    )
+    val NAME_LABELLED_TE = RegexDetector(
+        DataCategory.PERSON_NAME, "Name",
+        Regex("""(?:(?<![\u0C00-\u0C7F])పేరు[ \t]*[:\u0C03\-][ \t]*|(?<![\u0C00-\u0C7F])ప్రియమైన[ \t]+(?!శ్రీ|కుమారి|డా))(?<v>$NAME_TE|$NAME)"""),
+    )
+    val DOB_TE = RegexDetector(
+        DataCategory.DATE_OF_BIRTH, "Date of birth",
+        Regex("""(?:పుట్టిన[ \t]*తేదీ|జన్మ[ \t]*తేదీ)[ \t]*[:\u0C03\-]?[ \t]*(?<v>\d{1,2}[/.\- ]\d{1,2}[/.\- ]\d{2,4})"""),
+    )
+
     val DEFAULT: List<Detector> = listOf(
         ABHA_ADDRESS, EMAIL, AADHAAR, MASKED_AADHAAR, PAN, ABHA_NUMBER, CARD, AddressDetector, PHONE, RECORD_ID, BANK_ACCOUNT,
-        DOB, DOB_HI, MONEY, NAME_HONORIFIC, NAME_LABELLED, NAME_HONORIFIC_HI, NAME_LABELLED_HI, HEALTH_CONDITION,
+        DOB, DOB_HI, DOB_TE, MONEY, NAME_HONORIFIC, NAME_LABELLED, NAME_HONORIFIC_HI, NAME_LABELLED_HI,
+        NAME_HONORIFIC_TE, NAME_LABELLED_TE, HEALTH_CONDITION,
     )
 }
 

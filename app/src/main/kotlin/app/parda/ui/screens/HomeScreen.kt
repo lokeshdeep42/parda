@@ -1,5 +1,11 @@
 package app.parda.ui.screens
 
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.DropdownMenu
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import app.parda.ui.components.asHeading
@@ -78,8 +84,19 @@ fun HomeScreen(
             Text("parda", style = MaterialTheme.typography.titleLarge)
             Spacer(Modifier.weight(1f))
             if (AppLanguage.switchable) {
-                // Named in the language it switches to, so it can be found by someone who reads only that one.
-                Pill(if (AppLanguage.isHindi(context)) "English" else "हिंदी", onClick = { AppLanguage.toggle(context) })
+                var languages by remember { mutableStateOf(false) }
+                val current = AppLanguage.current(context)
+                Box {
+                    Pill(AppLanguage.choices.first { it.first == current }.second + " ▾", onClick = { languages = true })
+                    DropdownMenu(expanded = languages, onDismissRequest = { languages = false }) {
+                        AppLanguage.choices.forEach { (code, name) ->
+                            DropdownMenuItem(
+                                text = { Text((if (code == current) "✓ " else "") + name) },
+                                onClick = { languages = false; if (code != current) AppLanguage.set(context, code) },
+                            )
+                        }
+                    }
+                }
             }
         }
         Text(stringResource(R.string.home_title), style = MaterialTheme.typography.headlineLarge, modifier = Modifier.asHeading())
