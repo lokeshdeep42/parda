@@ -46,7 +46,7 @@ object AddressDetector : Detector {
     override val category = DataCategory.ADDRESS
     override val name = "Address"
     private val pin = Regex("""(?<!\d)[1-9]\d{2}\s?\d{3}(?!\d)""")
-    // OCR often reads a colon after Devanagari as the visarga (ः), which looks the same.
+    // OCR often reads a colon after Devanagari as the visarga (\u0903), which looks the same.
     private val label = Regex("""^\s*[A-Za-z\u0900-\u097F][A-Za-z\u0900-\u097F ]{0,30}[:\u0903]\s*""")
 
     override fun find(text: String): List<Detection> {
@@ -195,6 +195,23 @@ object Detectors {
         ),
     )
 
+    /**
+     * Diagnoses: whatever follows "Diagnosis:" or "Impression:" on its line, and conditions named
+     * anywhere. Let through unless the user turns on the stricter health mode in the Firewall.
+     */
+    val HEALTH_CONDITION = RegexDetector(
+        DataCategory.HEALTH_CONDITION, "Health condition",
+        Regex(
+            """(?i)(?:\b(?:(?:provisional |final )?diagnosis|impression|chief complaints?|known case of|k/c/o)[ \t]*[:\-][ \t]*|(?<![\u0900-\u097F])निदान[ \t]*[:\u0903\-][ \t]*)(?<v>[^\n]{3,120})""" +
+                """|\b(?:type[ -]?[12] )?diabet(?:es|ic)\b|\bhypertension\b|\bhypo- ?thyroid\w*|\bhyper- ?thyroid\w*|\bthyroid disorder\b""" +
+                """|\bHIV\b|\bAIDS\b|\bhepatitis(?: [ABC])?\b|\btuberculosis\b|\bcancer\b|\bcarcinoma\b|\bmalignan\w+|\btumou?r\b""" +
+                """|\bpregnan(?:t|cy)\b|\ban(?:a)?emi[ac]\b|\basthma\b|\bCOPD\b|\bdepression\b|\banxiety disorder\b|\bbipolar\b|\bschizophreni\w+""" +
+                """|\bepilep\w+|\bdementia\b|\balzheimer\w*|\bparkinson\w*|\bchronic kidney disease\b|\bdialysis\b|\bcirrhosis\b|\bPCO[DS]\b""" +
+                """|\binfertility\b|\bsyphilis\b|\bgonorrh\w+|\bdengue\b|\bmalaria\b|\btyphoid\b|\bADHD\b|\bautism\b""" +
+                """|मधुमेह|उच्च रक्तचाप|कैंसर|गर्भावस्था|एचआईवी|टीबी|अवसाद""",
+        ),
+    )
+
     // Devanagari: letters and vowel signs, without the danda (।) or Devanagari digits. A Hindi
     // name runs at most three words and stops at a postposition ("राजेश कुमार को" -> "राजेश कुमार").
     private const val DEVA = """[\u0900-\u0963\u0971-\u097F]+"""
@@ -215,7 +232,7 @@ object Detectors {
 
     val DEFAULT: List<Detector> = listOf(
         ABHA_ADDRESS, EMAIL, AADHAAR, MASKED_AADHAAR, PAN, ABHA_NUMBER, CARD, AddressDetector, PHONE, RECORD_ID, BANK_ACCOUNT,
-        DOB, DOB_HI, MONEY, NAME_HONORIFIC, NAME_LABELLED, NAME_HONORIFIC_HI, NAME_LABELLED_HI,
+        DOB, DOB_HI, MONEY, NAME_HONORIFIC, NAME_LABELLED, NAME_HONORIFIC_HI, NAME_LABELLED_HI, HEALTH_CONDITION,
     )
 }
 

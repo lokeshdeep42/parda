@@ -16,6 +16,11 @@ enum class DataCategory(val label: String, val tokenPrefix: String) {
     DATE_OF_BIRTH("Dates of birth", "DOB"),
     /** Hospital and lab record numbers (UHID, MRN, lab no.) and ABHA addresses: they point to one patient. */
     HEALTH_ID("Health record IDs", "HEALTHID"),
+    /**
+     * Diagnoses and conditions. Let through by default, since explaining a report needs them;
+     * masking them is the stricter mode, for a report going to an employer or an insurer.
+     */
+    HEALTH_CONDITION("Health conditions", "CONDITION"),
 }
 
 /** What the outbound gate does with one detected item. */
@@ -97,6 +102,7 @@ data class Policy(
             DataCategory.ADDRESS to DisclosureAction.SURROGATE,
             DataCategory.DATE_OF_BIRTH to DisclosureAction.SURROGATE,
             DataCategory.HEALTH_ID to DisclosureAction.SURROGATE,
+            DataCategory.HEALTH_CONDITION to DisclosureAction.ALLOW,
         )
 
         val DEFAULT_CHECKOUT: Map<DarkPatternKind, CheckoutAction> = mapOf(
