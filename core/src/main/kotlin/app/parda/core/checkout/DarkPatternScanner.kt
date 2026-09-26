@@ -16,7 +16,13 @@ data class ScreenNode(
     val checked: Boolean = false,
     val children: List<ScreenNode> = emptyList(),
 ) {
+    /** What the node says. Web pages sometimes leak markup into labels ("<font …>Price Drop…</font>"). */
     val label: String get() = listOfNotNull(text, contentDescription).firstOrNull { it.isNotBlank() }.orEmpty()
+        .let { if ('<' in it) it.replace(TAG, "").trim() else it }
+
+    private companion object {
+        val TAG = Regex("""</?[a-zA-Z][^<>]*>""")
+    }
 }
 
 data class Finding(
@@ -82,6 +88,8 @@ class DarkPatternScanner {
 
         // 1. Pre-ticked items: add-ons and trials.
         for (n in all.filter { it.checkable && it.checked }) {
+            // Web checkboxes often nest a ticked box inside a ticked label: report the outer one.
+            if (generateSequence(parents[n.id]) { parents[it.id] }.any { it.checkable && it.checked }) continue
             val row = rowOf(n, parents)
             val text = textOf(n)
             val kind = when {
@@ -96,6 +104,33 @@ class DarkPatternScanner {
                 nodeId = n.id,
                 cost = Money.oneOffAmounts(text).firstOrNull() ?: 0,
                 recurring = Money.recurringAmount(text) ?: 0,
+            )
+        }
+
+        // 1b. Extras already in the cart with no checkbox, only a "Remove" link beside them
+        // ("If price drops, get your money back!  REMOVE"). The link is what a fix would tap.
+        for (n in all.filter { !it.checkable && isRemoveControl(it.label) }) {
+            val row = rowOf(n, parents)
+            if (row === n) continue
+            val text = rowText(row, n).replace(n.label, "").trim()
+            val kind = when {
+                SUBSCRIPTION.containsMatchIn(text) -> DarkPatternKind.SUBSCRIPTION_TRAP
+                ADDON.containsMatchIn(text) -> DarkPatternKind.BASKET_SNEAKING
+                else -> continue
+            }
+            if (!rowsSeen.add(row.id)) continue
+            findings += Finding(kind, cleanLabel(text), n.id, Money.oneOffAmounts(text).firstOrNull() ?: 0, Money.recurringAmount(text) ?: 0)
+        }
+
+        // 1c. A membership that is already a line of the bill, not merely offered ("Add Gold at ₹1").
+        for (n in all.filter { !it.checkable && SUBSCRIPTION.containsMatchIn(it.label) }) {
+            val row = rowOf(n, parents)
+            val text = textOf(n)
+            if (OFFER.containsMatchIn(text) || Money.oneOffAmounts(text).isEmpty() && Money.recurringAmount(text) == null) continue
+            if (!rowsSeen.add(row.id)) continue
+            findings += Finding(
+                DarkPatternKind.SUBSCRIPTION_TRAP, cleanLabel(n.label), null,
+                Money.oneOffAmounts(text).firstOrNull() ?: 0, Money.recurringAmount(text) ?: 0,
             )
         }
 
@@ -120,13 +155,24 @@ class DarkPatternScanner {
     }
 
     /**
-     * The row a node belongs to: its parent, if that parent is small enough to be a single
-     * line item (a checkbox, a label and a price), otherwise the node itself.
+     * The row a node belongs to: the nearest ancestor that is still small enough to be a single
+     * line item (a checkbox, a label and a price). It climbs past wrappers until it reaches a
+     * price, because apps nest them: Swiggy puts "Handling Fee" three levels below the row that
+     * holds "₹12.00". A node with no small ancestor is its own row.
      */
     private fun rowOf(n: ScreenNode, parents: Map<String, ScreenNode>): ScreenNode {
-        val p = parents[n.id] ?: return n
-        return if (countLabelled(p) <= MAX_ROW_TEXTS) p else n
+        var row = n
+        while (true) {
+            val p = parents[row.id] ?: break
+            if (countLabelled(p) > MAX_ROW_TEXTS) break
+            row = p
+            if (hasPrice(row)) break
+        }
+        return row
     }
+
+    private fun hasPrice(n: ScreenNode): Boolean =
+        PRICE_ONLY.containsMatchIn(n.label) || n.children.any { hasPrice(it) }
 
     private fun countLabelled(n: ScreenNode): Int =
         (if (n.label.isNotBlank()) 1 else 0) + n.children.sumOf { countLabelled(it) }
@@ -146,18 +192,31 @@ class DarkPatternScanner {
         private const val MAX_ROW_TEXTS = 4
         private const val MIN_PRICES = 2
 
-        private val PRICE_ONLY = Regex("""(?i)(free|(₹|rs\.?|inr)\s?\d[\d,]*(\.\d{1,2})?)""")
+        private val PRICE_ONLY = Regex("""(?i)(\bfree\b|(₹|\brs\.?|\binr)\s?\d[\d,]*(\.\d{1,2})?|\d[\d,]*(\.\d{1,2})?\s?rupees?\b)""")
 
+        // Real carts name their last step many ways: Swiggy "To Pay", Zomato "Bill Summary",
+        // Goibibo's traveller page only "₹ 6,768 FOR 1 ADULT".
         private val CHECKOUT = Regex(
-            """\b(checkout|check out|to pay|total payable|amount payable|place order|pay now|proceed to pay|order summary|bill details|payment)\b""",
+            """\b(checkout|check out|to pay|total payable|amount payable|place order|pay now|proceed to pay|order summary|bill details|payment""" +
+                """|bill summary|total bill|grand total|item total|total amount|amount to pay|fare summary|fare breakup|traveller details|review booking|your cart|for \d+ adults?)\b""",
             RegexOption.IGNORE_CASE,
         )
+
+        /** A link or button that takes an extra back out of the cart. */
+        private val REMOVE = Regex("""(?i)^\s*(remove|remove add-?on|remove item|✕)\s*$""")
+
+        /** Wording of an offer the user has not taken up yet. */
+        private val OFFER = Regex("""(?i)(^|\s)(add|get|join|try|unlock|upgrade|save|buy)\s""")
+
+        /** True for a "Remove" control: a fix may tap it to take out an extra Parda found. */
+        fun isRemoveControl(label: String): Boolean = REMOVE.matches(label)
         private val SUBSCRIPTION = Regex(
             """\b(free trial|trial|auto[- ]?renew\w*|membership|subscribe|subscription|per month|/mo\b)""",
             RegexOption.IGNORE_CASE,
         )
         private val ADDON = Regex(
-            """\b(protection|insurance|insure|warranty|donat\w*|charity|round[- ]?up|tip|gift wrap|priority|care plan|cover|safety fee)\b""",
+            """\b(protection|insurance|insure|warranty|donat\w*|charity|contribut\w*|plantation|plant\w* trees?|round[- ]?up|tip|gift wrap|priority""" +
+                """|care plan|cover|safety fee|price drops?|money back|trip secure)\b""",
             RegexOption.IGNORE_CASE,
         )
         private val FEE = Regex(

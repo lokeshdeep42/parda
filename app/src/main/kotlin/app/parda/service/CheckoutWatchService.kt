@@ -21,6 +21,7 @@ import app.parda.PardaApp
 import app.parda.R
 import app.parda.core.checkout.CheckoutGate
 import app.parda.core.checkout.CheckoutScan
+import app.parda.core.checkout.DarkPatternScanner
 import app.parda.core.checkout.Finding
 import app.parda.core.checkout.Money
 import app.parda.core.ledger.Channel
@@ -123,7 +124,10 @@ class CheckoutWatchService : AccessibilityService() {
             val id = f.nodeId ?: return@filter false
             if (!CheckoutGate.mayUntick(id, scan)) return@filter false
             val node = ScreenSnapshot.resolve(root, id) ?: return@filter false
-            if (!node.isCheckable || !with(ScreenSnapshot) { node.isCheckedCompat }) return@filter false
+            // Either a ticked box, or the "Remove" link beside an extra that has no box.
+            val ok = if (node.isCheckable) with(ScreenSnapshot) { node.isCheckedCompat }
+            else DarkPatternScanner.isRemoveControl((node.text ?: node.contentDescription ?: "").toString())
+            if (!ok) return@filter false
             clickable(node)?.performAction(AccessibilityNodeInfo.ACTION_CLICK) == true
         }
 
