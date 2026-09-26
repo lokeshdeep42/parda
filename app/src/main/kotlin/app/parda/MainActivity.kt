@@ -1,5 +1,7 @@
 package app.parda
 
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -199,7 +201,7 @@ private fun FloatingNav(selected: Int, onSelect: (Int) -> Unit, modifier: Modifi
                 Modifier.size(52.dp).clip(CircleShape).background(if (on) Frost.Night else Color.Transparent),
                 contentAlignment = Alignment.Center,
             ) {
-                IconButton(onClick = { onSelect(i) }, modifier = Modifier.semantics { this.selected = on }) {
+                IconButton(onClick = { onSelect(i) }, modifier = Modifier.semantics { role = Role.Tab; this.selected = on }) {
                     StrokeIcon(icon, tint = if (on) Color.White else Frost.Ink, contentDescription = label)
                 }
             }
