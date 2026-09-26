@@ -55,15 +55,27 @@ class DarkPatternScanner {
 
     fun scan(root: ScreenNode): CheckoutScan {
         val parents = HashMap<String, ScreenNode>()
+        val nextSibling = HashMap<String, ScreenNode>()
         val all = mutableListOf<ScreenNode>()
         fun walk(n: ScreenNode) {
             all += n
+            n.children.zipWithNext { a, b -> nextSibling[a.id] = b }
             n.children.forEach { parents[it.id] = n; walk(it) }
         }
         walk(root)
 
         val screenText = all.joinToString("\n") { it.label }
-        if (!CHECKOUT.containsMatchIn(screenText)) return CheckoutScan.NONE
+        // A checkout word alone is not enough (news feeds say "payment"); a cart shows prices.
+        if (!CHECKOUT.containsMatchIn(screenText) || Money.oneOffAmounts(screenText).size < MIN_PRICES) {
+            return CheckoutScan.NONE
+        }
+        fun textOf(n: ScreenNode): String {
+            val row = rowOf(n, parents)
+            if (row !== n) return rowText(row, n)
+            // Flat layout (web pages in Chrome): the price is the next sibling, not a child.
+            val next = nextSibling[n.id]?.takeIf { !it.checkable && PRICE_ONLY.matches(it.label.trim()) }
+            return listOfNotNull(n.label, next?.label).joinToString("  ")
+        }
 
         val findings = mutableListOf<Finding>()
         val rowsSeen = HashSet<String>()
@@ -71,7 +83,7 @@ class DarkPatternScanner {
         // 1. Pre-ticked items: add-ons and trials.
         for (n in all.filter { it.checkable && it.checked }) {
             val row = rowOf(n, parents)
-            val text = rowText(row, n)
+            val text = textOf(n)
             val kind = when {
                 SUBSCRIPTION.containsMatchIn(text) -> DarkPatternKind.SUBSCRIPTION_TRAP
                 ADDON.containsMatchIn(text) -> DarkPatternKind.BASKET_SNEAKING
@@ -80,7 +92,7 @@ class DarkPatternScanner {
             rowsSeen += row.id
             findings += Finding(
                 kind = kind,
-                evidence = cleanLabel(text),
+                evidence = cleanLabel(n.label.ifBlank { text }), // the item itself; its price is shown separately
                 nodeId = n.id,
                 cost = Money.oneOffAmounts(text).firstOrNull() ?: 0,
                 recurring = Money.recurringAmount(text) ?: 0,
@@ -91,9 +103,9 @@ class DarkPatternScanner {
         for (n in all.filter { !it.checkable && FEE.containsMatchIn(it.label) }) {
             val row = rowOf(n, parents)
             if (!rowsSeen.add(row.id)) continue
-            val text = rowText(row, n)
+            val text = textOf(n)
             val cost = Money.oneOffAmounts(text).firstOrNull() ?: continue
-            if (cost > 0) findings += Finding(DarkPatternKind.DRIP_PRICING, cleanLabel(text), null, cost)
+            if (cost > 0) findings += Finding(DarkPatternKind.DRIP_PRICING, cleanLabel(n.label.ifBlank { text }), null, cost)
         }
 
         // 3. Pressure: countdowns and scarcity.
@@ -132,6 +144,9 @@ class DarkPatternScanner {
 
     companion object {
         private const val MAX_ROW_TEXTS = 4
+        private const val MIN_PRICES = 2
+
+        private val PRICE_ONLY = Regex("""(?i)(free|(₹|rs\.?|inr)\s?\d[\d,]*(\.\d{1,2})?)""")
 
         private val CHECKOUT = Regex(
             """\b(checkout|check out|to pay|total payable|amount payable|place order|pay now|proceed to pay|order summary|bill details|payment)\b""",

@@ -5,7 +5,9 @@ import android.accessibilityservice.AccessibilityService
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
+import android.util.Log
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
@@ -34,10 +36,7 @@ import app.parda.store
 class CheckoutWatchService : AccessibilityService() {
     private val handler = Handler(Looper.getMainLooper())
     private var pending: Runnable? = null
-    private var currentPackage: String? = null
 
-    /** Findings already acted on for the current checkout, so one screen is not reported twice. */
-    private val handled = HashSet<String>()
 
     override fun onServiceConnected() {
         instance = this
@@ -63,19 +62,26 @@ class CheckoutWatchService : AccessibilityService() {
         val root = rootInActiveWindow ?: return
         if (root.packageName?.toString() != pkg) return
         if (pkg == packageName && !DemoCheckoutActivity.visible) return
-        if (pkg != currentPackage) {
-            currentPackage = pkg
-            handled.clear()
-        }
 
-        val scan = store.scanner.scan(ScreenSnapshot.capture(root))
+        val snapshot = ScreenSnapshot.capture(root)
+        val scan = store.scanner.scan(snapshot)
+        if (debuggable && scan.isCheckout) {
+            // Debug builds only: what the shield read and concluded, for tuning against real apps.
+            Log.i(TAG, "checkout in $pkg\n" + ScreenSnapshot.dump(snapshot))
+            scan.findings.forEach { Log.i(TAG, "finding ${it.kind} fixable=${it.fixable} cost=${it.cost}: ${it.evidence}") }
+        }
+        val now = System.currentTimeMillis()
+        val seen = handled.getOrPut(pkg) { HashSet() }
         if (!scan.isCheckout) {
-            handled.clear()
+            // A half-drawn screen during a transition can look like "not a checkout". Only
+            // forget what was handled once the user has really been away for a while.
+            if (now - (lastCheckoutAt[pkg] ?: 0L) > FORGET_AFTER_MS) seen.clear()
             return
         }
-        val fresh = scan.findings.filter { it.key !in handled }
+        lastCheckoutAt[pkg] = now
+        val fresh = scan.findings.filter { it.key !in seen }
         if (fresh.isEmpty()) return
-        handled += fresh.map { it.key }
+        seen += fresh.map { it.key }
 
         val plan = CheckoutGate.plan(CheckoutScan(true, fresh), store.policy.value)
         val app = appLabel(pkg)
@@ -178,8 +184,21 @@ class CheckoutWatchService : AccessibilityService() {
         packageManager.getApplicationLabel(packageManager.getApplicationInfo(pkg, 0)).toString()
     }.getOrDefault(pkg)
 
+    private val debuggable by lazy { applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0 }
+
     companion object {
+        private const val TAG = "PardaShield"
         private const val DEBOUNCE_MS = 600L
+        private const val FORGET_AFTER_MS = 10_000L
+
+        /**
+         * Findings already acted on, per app, so one checkout is not reported twice. Per app
+         * because the active window flickers between apps while sheets open and close; held
+         * here, not on the instance, because some OEMs (iQOO) rebind the service every few
+         * seconds and each rebind is a fresh object.
+         */
+        private val handled = HashMap<String, MutableSet<String>>()
+        private val lastCheckoutAt = HashMap<String, Long>()
         private const val AFTER_SHEET_MS = 450L
         private const val NOTIFICATION_ID = 1
 
