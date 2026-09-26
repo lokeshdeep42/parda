@@ -1,5 +1,6 @@
 package app.parda.ui.screens
 
+import android.text.format.DateUtils
 import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.DropdownMenu
@@ -237,11 +238,16 @@ fun AirlockScreen(initialText: String?, initialImage: Uri? = null) {
                                 Channel.B, Verdict.HELD_LOCALLY,
                                 "${d.result.detections.size} sensitive item(s) classified; answered on the device by $planner, nothing prepared to send",
                             )
-                            is GateDecision.HandedBack -> store.record(
-                                Channel.B, Verdict.HANDED_BACK,
-                                "${d.result.vault.withheld} item(s) withheld (${d.result.blockedCount} blocked); planned by $planner; sanitized copy prepared, nothing transmitted",
-                                masked = d.result.vault.withheld,
-                            )
+                            is GateDecision.HandedBack -> {
+                                store.record(
+                                    Channel.B, Verdict.HANDED_BACK,
+                                    "${d.result.vault.withheld} item(s) withheld (${d.result.blockedCount} blocked); planned by $planner; sanitized copy prepared, nothing transmitted",
+                                    masked = d.result.vault.withheld,
+                                )
+                                // Named by the safe copy's first line, so the title itself holds no real value.
+                                val title = d.outbound.lineSequence().map { it.trim() }.firstOrNull { it.isNotEmpty() }.orEmpty()
+                                withContext(Dispatchers.IO) { store.vaults.remember(title, d.result.vault) }
+                            }
                         }
                     }
                 },
@@ -254,6 +260,8 @@ fun AirlockScreen(initialText: String?, initialImage: Uri? = null) {
                     SectionLabel("Writing on this phone…")
                     Text(streamed, style = MaterialTheme.typography.bodyLarge)
                 }
+            } else if (!thinking) {
+                ReplyCard()
             }
             is GateDecision.HeldLocally -> {
                 NightCard {
@@ -303,6 +311,10 @@ fun AirlockScreen(initialText: String?, initialImage: Uri? = null) {
                 }
                 GlassCard(padding = 16.dp) {
                     SectionLabel("Bring the reply back")
+                    Text(
+                        "No rush: this vault is kept on the phone for a day, encrypted, so you can paste the answer here later too.",
+                        style = MaterialTheme.typography.bodyMedium, color = Frost.Ink2,
+                    )
                     OutlinedTextField(
                         value = reply,
                         onValueChange = { reply = it },
@@ -316,6 +328,53 @@ fun AirlockScreen(initialText: String?, initialImage: Uri? = null) {
                     }
                 }
                 QuietButton("Start over", onClick = { decision = null; reply = "" })
+            }
+        }
+    }
+}
+
+/**
+ * Brings an outside assistant's answer back after the fact: the placeholders it mentions are
+ * matched to the copy it answers, and the real names return, on this phone only.
+ */
+@Composable
+private fun ReplyCard() {
+    val context = LocalContext.current
+    val store = context.store
+    val clipboard = LocalClipboardManager.current
+    val archive by store.vaults.archive.collectAsStateWithLifecycle()
+    LaunchedEffect(Unit) { withContext(Dispatchers.IO) { store.vaults.refresh() } }
+    if (archive.handBacks.isEmpty()) return
+    var reply by rememberSaveable { mutableStateOf("") }
+
+    GlassCard(padding = 16.dp) {
+        SectionLabel("Bring a reply back")
+        val n = archive.handBacks.size
+        Text(
+            "$n cop${if (n == 1) "y" else "ies"} you took outside in the last day ${if (n == 1) "is" else "are"} remembered here, encrypted. " +
+                "Paste an answer that says <PERSON_1> and it reads with the real name.",
+            style = MaterialTheme.typography.bodyMedium, color = Frost.Ink2,
+        )
+        OutlinedTextField(
+            value = reply,
+            onValueChange = { reply = it },
+            modifier = Modifier.fillMaxWidth().heightIn(min = 90.dp),
+            label = { Text("The outside model's answer") },
+            colors = fieldColors(),
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Pill("Paste", onClick = { reply = clipboard.getText()?.text.orEmpty() })
+            Pill("Forget all now", onClick = { store.vaults.forgetAll(); reply = "" })
+        }
+        if (reply.isNotBlank()) {
+            val match = archive.bestFor(reply)
+            if (match == null) {
+                Text("This answer mentions none of the placeholders Parda made.", style = MaterialTheme.typography.bodyMedium, color = Frost.Ink2)
+            } else {
+                val restored = match.vault.rehydrate(reply)
+                SectionLabel("Reads back to you as · from “${match.title.take(40)}”, ${DateUtils.getRelativeTimeSpanString(match.at)}")
+                SelectionContainer { Text(restored, style = MaterialTheme.typography.bodyLarge) }
+                Pill("Copy", strong = true, onClick = { clipboard.setText(AnnotatedString(restored)) })
             }
         }
     }

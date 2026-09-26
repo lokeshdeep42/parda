@@ -52,6 +52,7 @@ class CheckoutWatchService : AccessibilityService() {
     override fun onInterrupt() = Unit
 
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
+        lastEventAt = System.currentTimeMillis()
         val pkg = event.packageName?.toString() ?: return
         if (pkg in IGNORED_PACKAGES) return
         // Parda's own screens are never scanned, except the demo store (see DemoCheckoutActivity).
@@ -222,6 +223,14 @@ class CheckoutWatchService : AccessibilityService() {
         @Volatile
         var instance: CheckoutWatchService? = null
             private set
+
+        /** When the shield last saw anything on screen: proof it is really running, not just switched on. */
+        @Volatile
+        var lastEventAt = 0L
+            private set
+
+        /** Bound by the system right now. Switched on in Settings is not enough: OEMs stop services. */
+        val running: Boolean get() = instance != null
 
         /** Forgets what was handled in [pkg], so the next checkout there is reported afresh. */
         fun forget(pkg: String) {

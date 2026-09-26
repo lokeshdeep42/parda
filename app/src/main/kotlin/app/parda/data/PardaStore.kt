@@ -33,6 +33,9 @@ class PardaStore(context: Context) {
     val sanitizer = Sanitizer()
     val scanner = DarkPatternScanner()
 
+    /** Vaults of recent hand-backs, so a reply pasted back later reads with real names. */
+    val vaults = VaultStore(context)
+
     private val nativeLibDir = context.applicationInfo.nativeLibraryDir
     private val importDir = File(context.filesDir, "models")
     /** `adb push model.gguf /sdcard/Android/data/app.parda/files/models/` lands here. */
