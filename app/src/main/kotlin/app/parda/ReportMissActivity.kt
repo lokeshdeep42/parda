@@ -24,6 +24,8 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import app.parda.core.ledger.Channel
 import app.parda.core.ledger.Verdict
+import app.parda.core.policy.DataCategory
+import app.parda.core.policy.DisclosureAction
 import app.parda.core.policy.Policy
 import app.parda.service.CheckoutWatchService
 import app.parda.service.CheckoutWatchService.Companion.Seen
@@ -92,7 +94,7 @@ class ReportMissActivity : ComponentActivity() {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 SectionLabel("What the report holds")
                 Text(
-                    "The app's name, the time, what Parda found, your note, and the text Parda read on that screen, with names, numbers, addresses and IDs masked.",
+                    "The app's name, the time, what Parda found, your note, and the text Parda read on that screen, with names, phone numbers, addresses and IDs masked. Prices stay.",
                     style = MaterialTheme.typography.bodyMedium, color = Frost.Ink2,
                 )
             }
@@ -101,9 +103,11 @@ class ReportMissActivity : ComponentActivity() {
     }
 
     private fun share(s: Seen, note: String) {
-        // The strictest defaults, not the user's policy: a report is for someone else.
-        val masked = store.sanitizer.sanitize(s.dump, Policy()).sanitized
-        val maskedNote = store.sanitizer.sanitize(note, Policy()).sanitized
+        // The strictest defaults, not the user's policy: a report is for someone else. Prices
+        // stay, since they are what a checkout miss is about and a shop's prices are not personal.
+        val policy = Policy().with(DataCategory.MONEY_AMOUNT, DisclosureAction.ALLOW)
+        val masked = store.sanitizer.sanitize(s.dump, policy).sanitized
+        val maskedNote = store.sanitizer.sanitize(note, policy).sanitized
         val version = packageManager.getPackageInfo(packageName, 0).versionName
         val report = buildString {
             appendLine("Parda miss report")
