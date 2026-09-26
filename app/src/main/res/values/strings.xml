@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Parda</string>
+    <string name="share_label">Check with Parda</string>
+    <string name="process_text_label">Mask with Parda</string>
+    <string name="a11y_label">Parda checkout shield</string>
+    <string name="a11y_description">Parda reads checkout screens on this phone to spot pre-ticked add-ons, last-step fees, fake timers and guilt-worded buttons. It never taps Pay, and it has no internet permission, so nothing it reads can leave the device.</string>
+    <string name="channel_intercepts">Checkout intercepts</string>
+</resources>

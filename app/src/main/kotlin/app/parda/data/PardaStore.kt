@@ -1,0 +1,87 @@
+package app.parda.data
+
+import android.content.Context
+import android.net.TrafficStats
+import android.os.Process
+import app.parda.core.agent.DisclosureGate
+import app.parda.core.agent.RuleBasedAgent
+import app.parda.core.checkout.DarkPatternScanner
+import app.parda.core.disclosure.Sanitizer
+import app.parda.core.ledger.Channel
+import app.parda.core.ledger.Ledger
+import app.parda.core.ledger.LedgerEntry
+import app.parda.core.ledger.Verdict
+import app.parda.core.policy.Policy
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.serialization.json.Json
+import java.io.File
+
+/**
+ * Everything Parda keeps, all of it in app-private storage on this device: the policy, the
+ * ledger and the onboarding flag. There is no sync and no account.
+ */
+class PardaStore(context: Context) {
+    private val prefs = context.getSharedPreferences("parda", Context.MODE_PRIVATE)
+    private val ledgerFile = File(context.filesDir, "ledger.jsonl")
+    private val json = Json { ignoreUnknownKeys = true }
+
+    val sanitizer = Sanitizer()
+    val scanner = DarkPatternScanner()
+
+    // Swap RuleBasedAgent for the llama.cpp-backed agent once a model is installed.
+    val gate = DisclosureGate(RuleBasedAgent(), sanitizer = sanitizer)
+
+    private val _policy = MutableStateFlow(loadPolicy())
+    val policy: StateFlow<Policy> = _policy.asStateFlow()
+
+    private val ledger: Ledger = runCatching {
+        if (ledgerFile.exists()) Ledger.fromJsonLines(ledgerFile.readText()) else Ledger()
+    }.getOrElse { Ledger() }
+    private val _entries = MutableStateFlow(ledger.all)
+    val entries: StateFlow<List<LedgerEntry>> = _entries.asStateFlow()
+
+    private val _onboarded = MutableStateFlow(prefs.getBoolean(KEY_ONBOARDED, false))
+    val onboarded: StateFlow<Boolean> = _onboarded.asStateFlow()
+
+    fun setPolicy(policy: Policy) {
+        _policy.value = policy
+        prefs.edit().putString(KEY_POLICY, json.encodeToString(Policy.serializer(), policy)).apply()
+    }
+
+    fun setOnboarded() {
+        _onboarded.value = true
+        prefs.edit().putBoolean(KEY_ONBOARDED, true).apply()
+    }
+
+    @Synchronized
+    fun record(
+        channel: Channel,
+        verdict: Verdict,
+        detail: String,
+        savedPaise: Long = 0,
+        masked: Int = 0,
+        patterns: Int = 0,
+    ) {
+        ledger.append(channel, verdict, detail, savedPaise, masked, patterns)
+        ledgerFile.writeText(ledger.toJsonLines())
+        _entries.value = ledger.all
+    }
+
+    fun totals(): Ledger.Totals = ledger.totals()
+
+    fun ledgerIntact(): Boolean = ledger.verify() == -1
+
+    /** Bytes this app's UID has sent over any network since boot, as counted by the OS. */
+    fun egressBytes(): Long = TrafficStats.getUidTxBytes(Process.myUid()).coerceAtLeast(0)
+
+    private fun loadPolicy(): Policy = prefs.getString(KEY_POLICY, null)
+        ?.let { runCatching { json.decodeFromString(Policy.serializer(), it) }.getOrNull() }
+        ?: Policy()
+
+    private companion object {
+        const val KEY_POLICY = "policy"
+        const val KEY_ONBOARDED = "onboarded"
+    }
+}

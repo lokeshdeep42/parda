@@ -1,0 +1,186 @@
+package app.parda.core.detect
+
+import app.parda.core.policy.DataCategory
+
+/** One sensitive span found in a piece of text. [start] inclusive, [end] exclusive. */
+data class Detection(
+    val category: DataCategory,
+    val value: String,
+    val start: Int,
+    val end: Int,
+    val detector: String,
+)
+
+/** A deterministic recogniser for one shape of personal data. */
+interface Detector {
+    val category: DataCategory
+    val name: String
+    fun find(text: String): List<Detection>
+}
+
+/**
+ * Regex detector. If the pattern has a group named `v`, only that group is reported, so a
+ * label such as "DOB:" can anchor the match without being masked itself.
+ */
+class RegexDetector(
+    override val category: DataCategory,
+    override val name: String,
+    private val regex: Regex,
+    private val accept: (String) -> Boolean = { true },
+) : Detector {
+    private val hasValueGroup = "(?<v>" in regex.pattern
+
+    override fun find(text: String): List<Detection> = regex.findAll(text).mapNotNull { m ->
+        val group = (if (hasValueGroup) m.groups["v"] else null) ?: m.groups[0]!!
+        val value = group.value
+        if (!accept(value)) return@mapNotNull null
+        Detection(category, value, group.range.first, group.range.last + 1, name)
+    }.toList()
+}
+
+/**
+ * Indian postal addresses: a line that carries a comma and ends its address part in a
+ * six-digit PIN code. Label prefixes such as "Registered address:" are not masked.
+ */
+object AddressDetector : Detector {
+    override val category = DataCategory.ADDRESS
+    override val name = "Address"
+    private val pin = Regex("""(?<!\d)[1-9]\d{2}\s?\d{3}(?!\d)""")
+    private val label = Regex("""^\s*[A-Za-z][A-Za-z ]{0,30}:\s*""")
+
+    override fun find(text: String): List<Detection> {
+        val out = mutableListOf<Detection>()
+        var lineStart = 0
+        for (line in text.split('\n')) {
+            val pinMatch = pin.findAll(line).lastOrNull()
+            if (pinMatch != null && ',' in line.substring(0, pinMatch.range.first) &&
+                line.substring(0, pinMatch.range.first).any { it.isLetter() }
+            ) {
+                val from = label.find(line)?.range?.last?.plus(1) ?: line.indexOfFirst { !it.isWhitespace() }
+                val to = pinMatch.range.last + 1
+                if (from in 0 until to) {
+                    out += Detection(category, line.substring(from, to), lineStart + from, lineStart + to, name)
+                }
+            }
+            lineStart += line.length + 1
+        }
+        return out
+    }
+}
+
+object Checksums {
+    /** Luhn check used by payment card numbers. */
+    fun luhn(digits: String): Boolean {
+        if (digits.isEmpty() || digits.any { !it.isDigit() }) return false
+        var sum = 0
+        digits.reversed().forEachIndexed { i, c ->
+            var d = c - '0'
+            if (i % 2 == 1) { d *= 2; if (d > 9) d -= 9 }
+            sum += d
+        }
+        return sum % 10 == 0
+    }
+
+    private val verhoeffD = arrayOf(
+        intArrayOf(0, 1, 2, 3, 4, 5, 6, 7, 8, 9), intArrayOf(1, 2, 3, 4, 0, 6, 7, 8, 9, 5),
+        intArrayOf(2, 3, 4, 0, 1, 7, 8, 9, 5, 6), intArrayOf(3, 4, 0, 1, 2, 8, 9, 5, 6, 7),
+        intArrayOf(4, 0, 1, 2, 3, 9, 5, 6, 7, 8), intArrayOf(5, 9, 8, 7, 6, 0, 4, 3, 2, 1),
+        intArrayOf(6, 5, 9, 8, 7, 1, 0, 4, 3, 2), intArrayOf(7, 6, 5, 9, 8, 2, 1, 0, 4, 3),
+        intArrayOf(8, 7, 6, 5, 9, 3, 2, 1, 0, 4), intArrayOf(9, 8, 7, 6, 5, 4, 3, 2, 1, 0),
+    )
+    private val verhoeffP = arrayOf(
+        intArrayOf(0, 1, 2, 3, 4, 5, 6, 7, 8, 9), intArrayOf(1, 5, 7, 6, 2, 8, 3, 0, 9, 4),
+        intArrayOf(5, 8, 0, 3, 7, 9, 6, 1, 4, 2), intArrayOf(8, 9, 1, 6, 0, 4, 3, 5, 2, 7),
+        intArrayOf(9, 4, 5, 3, 1, 2, 6, 8, 7, 0), intArrayOf(4, 2, 8, 6, 5, 7, 3, 9, 0, 1),
+        intArrayOf(2, 7, 9, 3, 8, 0, 6, 4, 1, 5), intArrayOf(7, 0, 4, 6, 9, 1, 3, 2, 5, 8),
+    )
+
+    /** Verhoeff check used by Aadhaar numbers. */
+    fun verhoeff(digits: String): Boolean {
+        if (digits.isEmpty() || digits.any { !it.isDigit() }) return false
+        var c = 0
+        digits.reversed().forEachIndexed { i, ch -> c = verhoeffD[c][verhoeffP[i % 8][ch - '0']] }
+        return c == 0
+    }
+}
+
+private fun String.digitsOnly() = filter { it.isDigit() }
+
+/**
+ * The default detector set, in priority order: when two detections overlap, the one from
+ * the earlier detector wins, then the longer one.
+ */
+object Detectors {
+    val EMAIL = RegexDetector(
+        DataCategory.EMAIL, "Email",
+        Regex("""\b[\w.+-]+@[\w-]+(?:\.[\w-]+)*\.[A-Za-z]{2,}\b"""),
+    )
+    val AADHAAR = RegexDetector(
+        DataCategory.GOV_ID, "Aadhaar",
+        Regex("""(?<![\d-])[2-9]\d{3}[ -]?\d{4}[ -]?\d{4}(?![\d-])"""),
+        accept = { Checksums.verhoeff(it.digitsOnly()) },
+    )
+    val MASKED_AADHAAR = RegexDetector(
+        DataCategory.GOV_ID, "Aadhaar (masked)",
+        Regex("""(?<![\w*])[Xx*]{4}[ -]?[Xx*]{4}[ -]?\d{4}(?!\d)"""),
+    )
+    val PAN = RegexDetector(
+        DataCategory.GOV_ID, "PAN",
+        Regex("""\b[A-Z]{3}[ABCFGHLJPT][A-Z]\d{4}[A-Z]\b"""),
+    )
+    val CARD = RegexDetector(
+        DataCategory.CARD, "Card number",
+        Regex("""(?<!\d)\d(?:[ -]?\d){12,18}(?!\d)"""),
+        accept = { v -> v.digitsOnly().let { it.length in 13..19 && Checksums.luhn(it) } },
+    )
+    val PHONE = RegexDetector(
+        DataCategory.PHONE, "Phone",
+        Regex("""(?<![\d+])(?:\+91[\s-]?|0)?[6-9]\d{4}[\s-]?\d{5}(?!\d)"""),
+    )
+    val BANK_ACCOUNT = RegexDetector(
+        DataCategory.BANK_ACCOUNT, "Account number",
+        Regex("""(?<!\d)\d{9,18}(?!\d)"""),
+    )
+    val DOB = RegexDetector(
+        DataCategory.DATE_OF_BIRTH, "Date of birth",
+        Regex(
+            """(?i)\b(?:dob|d\.o\.b\.?|date of birth|born on)\s*[:\-]?\s*""" +
+                """(?<v>\d{1,2}[/.\- ]\d{1,2}[/.\- ]\d{2,4}|\d{1,2}\s+[A-Za-z]{3,9},?\s+\d{4})""",
+        ),
+    )
+    val MONEY = RegexDetector(
+        DataCategory.MONEY_AMOUNT, "Amount",
+        Regex(
+            """(?:₹|\bRs\.?|\bINR)\s?\d[\d,]*(?:\.\d{1,2})?(?:\s?(?:lakhs?|crores?|cr|L|k)\b)?""" +
+                """|\b\d+(?:\.\d+)?\s?(?:LPA|lakhs?|crores?)\b""",
+        ),
+    )
+    private const val CAP = """[A-Z][a-z]+"""
+    val NAME_HONORIFIC = RegexDetector(
+        DataCategory.PERSON_NAME, "Name",
+        Regex("""\b(?:Mr|Ms|Mrs|Dr|Shri|Smt|Kumari)\.?\s+(?<v>(?:[A-Z]\.\s?)*$CAP(?:\s+$CAP){0,2})\b"""),
+    )
+    val NAME_LABELLED = RegexDetector(
+        DataCategory.PERSON_NAME, "Name",
+        Regex("""(?:\b(?:[Nn]ame|NAME)\s*[:\-]\s*|\bDear\s+)(?<v>(?:[A-Z]\.\s?)*$CAP(?:\s+$CAP){0,2})\b"""),
+        accept = { it !in setOf("Sir", "Madam", "Customer", "Team", "User", "Friend", "All") },
+    )
+
+    val DEFAULT: List<Detector> = listOf(
+        EMAIL, AADHAAR, MASKED_AADHAAR, PAN, CARD, AddressDetector, PHONE, BANK_ACCOUNT,
+        DOB, MONEY, NAME_HONORIFIC, NAME_LABELLED,
+    )
+}
+
+/** Runs every detector and resolves overlaps into a clean, ordered list of spans. */
+class Classifier(private val detectors: List<Detector> = Detectors.DEFAULT) {
+    fun classify(text: String): List<Detection> {
+        val candidates = detectors.flatMapIndexed { rank, d -> d.find(text).map { rank to it } }
+            .sortedWith(compareBy<Pair<Int, Detection>> { it.first }.thenByDescending { it.second.end - it.second.start })
+        val taken = mutableListOf<Detection>()
+        for ((_, c) in candidates) {
+            if (taken.none { c.start < it.end && c.end > it.start }) taken += c
+        }
+        return taken.sortedBy { it.start }
+    }
+}
