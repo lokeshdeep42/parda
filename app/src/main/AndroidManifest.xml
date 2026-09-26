@@ -71,6 +71,37 @@
             </intent-filter>
         </activity>
 
+        <!-- "Mask & share" in any share sheet, and the clipboard tile: a sheet over the current app. -->
+        <activity
+            android:name=".QuickMaskActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:label="@string/quick_mask_label"
+            android:theme="@style/Theme.Parda.Translucent">
+            <intent-filter android:label="@string/quick_mask_label">
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+            <intent-filter android:label="@string/quick_mask_label">
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="image/*" />
+            </intent-filter>
+        </activity>
+
+        <service
+            android:name=".MaskClipboardTile"
+            android:exported="true"
+            android:icon="@drawable/ic_parda"
+            android:label="@string/tile_label"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
         <activity
             android:name=".service.InterceptActivity"
             android:exported="false"
