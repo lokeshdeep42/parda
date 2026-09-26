@@ -92,7 +92,7 @@ class CheckoutWatchService : AccessibilityService() {
         if (fresh.isEmpty()) return
         seen += fresh.map { it.key }
 
-        val plan = CheckoutGate.plan(CheckoutScan(true, fresh), store.policy.value)
+        val plan = CheckoutGate.plan(CheckoutScan(true, fresh), store.policy.value, app = pkg)
         val app = appLabel(pkg)
         store.record(
             Channel.A, Verdict.FLAGGED,
@@ -100,8 +100,9 @@ class CheckoutWatchService : AccessibilityService() {
             patterns = fresh.size,
         )
 
+        var saved = emptyList<Finding>()
         if (plan.autoRemove.isNotEmpty()) {
-            val saved = untick(root, scan, plan.autoRemove)
+            saved = untick(root, scan, plan.autoRemove)
             if (saved.isNotEmpty()) {
                 store.record(
                     Channel.A, Verdict.FIXED,
@@ -119,7 +120,7 @@ class CheckoutWatchService : AccessibilityService() {
                         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_ANIMATION),
                 )
             }
-            plan.shouldNotify -> notify(app, plan.flag + plan.autoRemove)
+            plan.shouldNotify -> notify(app, plan.flag, saved)
         }
     }
 
@@ -161,6 +162,8 @@ class CheckoutWatchService : AccessibilityService() {
             val targets = scan.findings.filter { it.fixable && it.key in approvedKeys }
             val removed = untick(root, scan, targets)
             if (removed.isNotEmpty()) {
+                // Remembered per app, so after a couple of times Parda can offer to do it unasked.
+                store.recordRemovals(pkg, removed.map { it.kind })
                 val recurring = removed.sumOf { it.recurring }
                 store.record(
                     Channel.A, Verdict.FIXED,
@@ -172,19 +175,27 @@ class CheckoutWatchService : AccessibilityService() {
         }, AFTER_SHEET_MS)
     }
 
-    private fun notify(app: String, findings: List<Finding>) {
+    /** [removed]: extras taken out without asking, by a rule the user set for this app. */
+    private fun notify(app: String, flagged: List<Finding>, removed: List<Finding> = emptyList()) {
+        if (flagged.isEmpty() && removed.isEmpty()) return
         if (Build.VERSION.SDK_INT >= 33 &&
             ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
         ) return
         val open = PendingIntent.getActivity(
             this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE,
         )
-        val text = findings.joinToString(" · ") { it.kind.label }
+        val title = if (removed.isNotEmpty()) {
+            "Parda removed ${removed.size} extra(s) in $app, as you asked" +
+                removed.sumOf { it.cost }.let { if (it > 0) " · ${Money.format(it)} kept" else "" }
+        } else {
+            "Parda flagged ${flagged.size} thing(s) in $app"
+        }
+        val text = (removed.map { it.evidence } + flagged.map { it.kind.label }).joinToString(" · ")
         NotificationManagerCompat.from(this).notify(
             NOTIFICATION_ID,
             NotificationCompat.Builder(this, PardaApp.CHANNEL_INTERCEPTS)
                 .setSmallIcon(R.drawable.ic_parda)
-                .setContentTitle("Parda flagged ${findings.size} thing(s) in $app")
+                .setContentTitle(title)
                 .setContentText(text)
                 .setContentIntent(open)
                 .setAutoCancel(true)

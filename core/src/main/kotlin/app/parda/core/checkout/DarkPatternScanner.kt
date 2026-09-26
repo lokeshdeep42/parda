@@ -251,12 +251,13 @@ data class CheckoutPlan(
  * way to authorise tapping Pay, or any other node.
  */
 object CheckoutGate {
-    fun plan(scan: CheckoutScan, policy: Policy): CheckoutPlan {
+    /** [app] is the package on screen, so the user's per-app rules apply there and nowhere else. */
+    fun plan(scan: CheckoutScan, policy: Policy, app: String? = null): CheckoutPlan {
         val auto = mutableListOf<Finding>()
         val ask = mutableListOf<Finding>()
         val flag = mutableListOf<Finding>()
         for (f in scan.findings) {
-            when (policy.actionFor(f.kind)) {
+            when (policy.actionFor(f.kind, app)) {
                 CheckoutAction.AUTO_REMOVE -> if (f.fixable) auto += f else ask += f
                 CheckoutAction.ASK_ME -> ask += f
                 CheckoutAction.FLAG_ONLY -> flag += f

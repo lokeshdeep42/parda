@@ -58,14 +58,25 @@ enum class CheckoutAction(val label: String) {
 data class Policy(
     val disclosure: Map<DataCategory, DisclosureAction> = DEFAULT_DISCLOSURE,
     val checkout: Map<DarkPatternKind, CheckoutAction> = DEFAULT_CHECKOUT,
+    /** Per app (package name): the kinds the user chose to have removed there without being asked. */
+    val perApp: Map<String, Set<DarkPatternKind>> = emptyMap(),
 ) {
     fun actionFor(category: DataCategory): DisclosureAction =
         disclosure[category] ?: DEFAULT_DISCLOSURE.getValue(category)
 
-    fun actionFor(kind: DarkPatternKind): CheckoutAction {
+    /** The action in [app]: the user's rule for that app first, then the global one. */
+    fun actionFor(kind: DarkPatternKind, app: String? = null): CheckoutAction {
+        if (app != null && kind.fixable && kind in perApp[app].orEmpty()) return CheckoutAction.AUTO_REMOVE
         val action = checkout[kind] ?: DEFAULT_CHECKOUT.getValue(kind)
         // Auto-remove is meaningless for patterns that cannot be undone on screen.
         return if (action == CheckoutAction.AUTO_REMOVE && !kind.fixable) CheckoutAction.ASK_ME else action
+    }
+
+    /** Turns removing [kind] without asking in [app] on or off. Only patterns a fix can undo qualify. */
+    fun autoRemove(app: String, kind: DarkPatternKind, on: Boolean): Policy {
+        if (!kind.fixable) return this
+        val kinds = perApp[app].orEmpty().let { if (on) it + kind else it - kind }
+        return copy(perApp = if (kinds.isEmpty()) perApp - app else perApp + (app to kinds))
     }
 
     fun with(category: DataCategory, action: DisclosureAction) =
