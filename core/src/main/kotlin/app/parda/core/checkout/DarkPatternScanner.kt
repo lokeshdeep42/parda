@@ -72,7 +72,9 @@ class DarkPatternScanner {
 
         val screenText = all.joinToString("\n") { it.label }
         // A checkout word alone is not enough (news feeds say "payment"); a cart shows prices.
-        if (!CHECKOUT.containsMatchIn(screenText) || Money.oneOffAmounts(screenText).size < MIN_PRICES) {
+        // A ride app's "tip for faster pickup" screen is where money is asked for, though it names no checkout.
+        val asked = CHECKOUT.containsMatchIn(screenText) || PRIORITY.containsMatchIn(screenText)
+        if (!asked || Money.oneOffAmounts(screenText).size < MIN_PRICES) {
             return CheckoutScan.NONE
         }
         fun textOf(n: ScreenNode): String {
@@ -80,7 +82,8 @@ class DarkPatternScanner {
             if (row !== n) return rowText(row, n)
             // Flat layout (web pages in Chrome): the price is the next sibling, not a child.
             val next = nextSibling[n.id]?.takeIf { !it.checkable && PRICE_ONLY.matches(it.label.trim()) }
-            return listOfNotNull(n.label, next?.label).joinToString("  ")
+            // A checkable row can carry its label and price in its own children.
+            return listOfNotNull(rowText(n, n).ifBlank { null }, next?.label).joinToString("  ")
         }
 
         val findings = mutableListOf<Finding>()
@@ -95,6 +98,8 @@ class DarkPatternScanner {
             val kind = when {
                 SUBSCRIPTION.containsMatchIn(text) -> DarkPatternKind.SUBSCRIPTION_TRAP
                 ADDON.containsMatchIn(text) -> DarkPatternKind.BASKET_SNEAKING
+                // Costs nothing now, but signs the user up for something they did not ask for.
+                CONSENT.containsMatchIn(text) -> DarkPatternKind.FORCED_ACTION
                 else -> continue
             }
             rowsSeen += row.id
@@ -151,6 +156,14 @@ class DarkPatternScanner {
         all.map { it.label }.filter { SHAMING.containsMatchIn(it) }.distinct()
             .forEach { findings += Finding(DarkPatternKind.CONFIRM_SHAMING, it.trim(), null) }
 
+        // 5. Paying more presented as the way to be served sooner ("Add a tip for faster pickup").
+        all.map { it.label }.filter { PRIORITY.containsMatchIn(it) }.distinct()
+            .forEach { findings += Finding(DarkPatternKind.PAY_FOR_PRIORITY, it.trim(), null, Money.oneOffAmounts(it).firstOrNull() ?: 0) }
+
+        // 6. Wording that makes declining the thing you have to do ("untick this box if you do not wish…").
+        all.map { it.label }.filter { TRICK.containsMatchIn(it) }.distinct()
+            .forEach { findings += Finding(DarkPatternKind.TRICK_WORDING, it.trim(), null) }
+
         return CheckoutScan(true, findings)
     }
 
@@ -198,7 +211,10 @@ class DarkPatternScanner {
         // Goibibo's traveller page only "₹ 6,768 FOR 1 ADULT".
         private val CHECKOUT = Regex(
             """\b(checkout|check out|to pay|total payable|amount payable|place order|pay now|proceed to pay|order summary|bill details|payment""" +
-                """|bill summary|total bill|grand total|item total|total amount|amount to pay|fare summary|fare breakup|traveller details|review booking|your cart|for \d+ adults?)\b""",
+                """|bill summary|total bill|grand total|item total|total amount|amount to pay|fare summary|fare breakup|traveller details|review booking|your cart|for \d+ adults?""" +
+                // BookMyShow "Booking Summary", PharmEasy "Price details", ride apps before a booking.
+                """|booking summary|payment summary|price details|price summary|order details|review (your )?(order|trip|booking)""" +
+                """|choose a ride|confirm (pickup|ride|booking)|book (ride|auto|bike|cab)|fare (details|estimate))\b""",
             RegexOption.IGNORE_CASE,
         )
 
@@ -211,16 +227,43 @@ class DarkPatternScanner {
         /** True for a "Remove" control: a fix may tap it to take out an extra Parda found. */
         fun isRemoveControl(label: String): Boolean = REMOVE.matches(label)
         private val SUBSCRIPTION = Regex(
-            """\b(free trial|trial|auto[- ]?renew\w*|membership|subscribe|subscription|per month|/mo\b)""",
+            """\b(free trial|trial|auto[- ]?renew\w*|membership|subscribe|subscription|per month|/mo\b""" +
+                // Paid memberships that are named for the brand, not "membership" (Zepto Pass, Swiggy One).
+                """|(zepto|swiggy|super|delivery|savings?) pass|swiggy one|zomato gold|pharmeasy plus|one blck)\b""",
             RegexOption.IGNORE_CASE,
         )
         private val ADDON = Regex(
             """\b(protection|insurance|insure|warranty|donat\w*|charity|contribut\w*|plantation|plant\w* trees?|round[- ]?up|tip|gift wrap|priority""" +
-                """|care plan|cover|safety fee|price drops?|money back|trip secure)\b""",
+                """|care plan|cover|safety fee|price drops?|money back|trip secure""" +
+                // Named causes and travel extras: Zomato and Blinkit, Physics Wallah, BookMyShow, MakeMyTrip.
+                """|feeding india|pw foundation|book ?a ?smile|zero cancellation|cancellation (protection|protect|cover|shield|guard)|trip guard|travel guard|assurance)\b""",
             RegexOption.IGNORE_CASE,
         )
         private val FEE = Regex(
-            """\b(handling|convenience|platform|packaging|packing|service|small[- ]cart|processing|surge|rain) (fee|charge)s?\b""",
+            """\b(handling|convenience|platform|packaging|packing|service|small[- ](cart|order)|processing|surge|rain|late[- ]night|booking|payment gateway|gateway) (fee|charge)s?\b""",
+            RegexOption.IGNORE_CASE,
+        )
+
+        /** A box that signs the user up or opts them in, rather than adding an item: SpiceJet's SpiceClub. */
+        private val CONSENT = Regex(
+            """\b(enrol\w*|enroll\w*|sign me up|loyalty|rewards|frequent flyer|\w*club|promotional|promotions|marketing|newsletter""" +
+                """|(receive|send me|get) (offers|updates|deals|communications?)|whatsapp (updates|notifications|alerts))\b""",
+            RegexOption.IGNORE_CASE,
+        )
+
+        /** Paying more framed as being served sooner: Uber's "advance tip", Rapido's fare boost. */
+        private val PRIORITY = Regex(
+            """\b(tip|boost|increase|raise|add|pay)\b[^.\n]{0,40}\b(faster|quicker|sooner|priority)\s+(pickup|pick-up|pick up|ride|driver|captain|acceptance|allocation|match\w*)\b""" +
+                """|\b(get|find)\s+(a |your )?(ride|driver|captain|cab|auto)\s+(faster|sooner|quicker)\b""" +
+                """|\bset your (own )?(price|fare)\b|\b(increase|raise|boost)\s+(your |the )?(fare|price|offer)\b""",
+            RegexOption.IGNORE_CASE,
+        )
+
+        /** Declining is the action: "untick this box if you do not wish to receive…". */
+        private val TRICK = Regex(
+            """\b(un-?tick|uncheck|de-?select|clear)\s+(this|the)\s+(check\s?)?box\s+(if|to)\b""" +
+                """|\b(tick|check|select)\s+(this|the)\s+(check\s?)?box\s+if\s+you\s+(do not|don'?t)\b""" +
+                """|\bif\s+you\s+(do not|don'?t)\s+(wish|want)\s+to\s+(receive|be\s+(contacted|enrolled|enroled))\b""",
             RegexOption.IGNORE_CASE,
         )
         private val URGENCY = Regex(
@@ -228,7 +271,10 @@ class DarkPatternScanner {
             RegexOption.IGNORE_CASE,
         )
         private val SHAMING = Regex(
-            """(^\s*no,?\s+thanks?\b.*\b(don'?t|do not|hate|rather|prefer|not interested in saving))|(\bi\s+(don'?t|do not)\s+(care|like|want)\b.*\b(sav\w+|support\w*|protect\w*|help\w*))""",
+            """(^\s*no,?\s+thanks?\b.*\b(don'?t|do not|hate|rather|prefer|not interested in saving))|(\bi\s+(don'?t|do not)\s+(care|like|want)\b.*\b(sav\w+|support\w*|protect\w*|help\w*))""" +
+                // IndiGo's "No I will take risk" (since changed to "No, I will not add to the trip").
+                """|(\bi('ll|\s+will)\s+take\s+(the\s+|my\s+|a\s+)?(risk|chances?)\b)|(\bi('ll|\s+will)\s+risk\s+it\b)|(\bleave\s+me\s+unprotected\b)""" +
+                """|(\bi\s+(don'?t|do not)\s+want\s+to\s+be\s+(protected|covered|insured|safe)\b)|(\bi('d|\s+would)\s+rather\s+(pay|risk|lose)\b)""",
             RegexOption.IGNORE_CASE,
         )
     }

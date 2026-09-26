@@ -225,6 +225,13 @@
     <string name="ds_movie">సినిమా టికెట్లు</string>
     <string name="ds_grocery">కిరాణా</string>
     <string name="ds_honest">పుస్తకాలు, మోసాలు లేవు</string>
+    <string name="kind_forced">ముందే ఎంచుకున్న సైన్-అప్‌లు</string>
+    <string name="kind_forced_hint">లాయల్టీ క్లబ్‌లు, ప్రచార సందేశాలు</string>
+    <string name="kind_priority">త్వరగా కావాలంటే అదనపు చెల్లింపు</string>
+    <string name="kind_priority_hint">“త్వరగా పికప్ కోసం టిప్ ఇవ్వండి”</string>
+    <string name="kind_trick">మోసపూరిత పదాలు</string>
+    <string name="kind_trick_hint">“వద్దనుకుంటే టిక్ తీసేయండి…”</string>
+    <string name="sheet_on_record">రికార్డులో</string>
     <string name="air_model_recommended">సిఫార్సు చేసినది</string>
     <plurals name="pl_decisions">
         <item quantity="one">%d నిర్ణయం</item>
