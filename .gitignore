@@ -10,3 +10,4 @@ captures/
 *.gguf
 .kotlin/
 bin/
+.vscode/
