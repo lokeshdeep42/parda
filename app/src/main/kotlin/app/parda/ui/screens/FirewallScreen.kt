@@ -1,5 +1,11 @@
 package app.parda.ui.screens
 
+import app.parda.ui.components.asHeading
+import app.parda.ui.hintText
+import app.parda.R
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.semantics
+import app.parda.ui.title
 import app.parda.ui.components.SectionLabel
 import androidx.compose.ui.platform.LocalContext
 import android.content.Context
@@ -42,12 +48,12 @@ import app.parda.ui.theme.Frost
 fun FirewallScreen(policy: Policy, onPolicy: (Policy) -> Unit) {
     var tab by rememberSaveable { mutableIntStateOf(0) }
     ScreenColumn {
-        Text("Firewall", style = MaterialTheme.typography.headlineLarge)
+        Text(stringResource(R.string.nav_firewall), style = MaterialTheme.typography.headlineLarge, modifier = Modifier.asHeading())
 
         Row(
             Modifier.fillMaxWidth().clip(CircleShape).background(Frost.Glass).padding(4.dp),
         ) {
-            listOf("Checkout", "Your data").forEachIndexed { i, label ->
+            listOf(stringResource(R.string.tab_checkout), stringResource(R.string.tab_your_data)).forEachIndexed { i, label ->
                 Box(
                     Modifier
                         .weight(1f)
@@ -68,16 +74,16 @@ fun FirewallScreen(policy: Policy, onPolicy: (Policy) -> Unit) {
                     val action = policy.actionFor(kind)
                     RuleRow(
                         dot = Frost.patternColor(kind),
-                        title = kind.label,
-                        hint = kind.hint,
-                        action = action.label,
+                        title = kind.title,
+                        hint = kind.hintText,
+                        action = action.title,
                         strong = action == CheckoutAction.AUTO_REMOVE,
                         last = i == DarkPatternKind.entries.lastIndex,
                     ) { onPolicy(policy.with(kind, nextCheckout(kind, action))) }
                 }
             }
             Text(
-                "Parda never taps Pay. Auto-remove only unticks boxes it found pre-ticked; everything else is shown to you.",
+                stringResource(R.string.fw_never_pay),
                 style = MaterialTheme.typography.bodyMedium, color = Frost.Ink2,
             )
             // Rules the user accepted on a checkout sheet ("next time, remove these here").
@@ -85,14 +91,14 @@ fun FirewallScreen(policy: Policy, onPolicy: (Policy) -> Unit) {
             if (rules.isNotEmpty()) {
                 val context = LocalContext.current
                 GlassCard(radius = 26.dp, padding = 16.dp) {
-                    SectionLabel("Removed without asking, in these apps only")
+                    SectionLabel(stringResource(R.string.fw_auto_apps))
                     rules.forEach { (app, kind) ->
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                             Column(Modifier.weight(1f)) {
                                 Text(appName(context, app), style = MaterialTheme.typography.titleMedium)
-                                Text(kind.label, style = MaterialTheme.typography.bodyMedium, color = Frost.Ink2)
+                                Text(kind.title, style = MaterialTheme.typography.bodyMedium, color = Frost.Ink2)
                             }
-                            Pill("Ask me again", onClick = { onPolicy(policy.autoRemove(app, kind, false)) })
+                            Pill(stringResource(R.string.fw_ask_again), onClick = { onPolicy(policy.autoRemove(app, kind, false)) })
                         }
                     }
                 }
@@ -103,20 +109,20 @@ fun FirewallScreen(policy: Policy, onPolicy: (Policy) -> Unit) {
                     val action = policy.actionFor(cat)
                     RuleRow(
                         dot = if (action == DisclosureAction.BLOCK) Frost.AlertInk else Frost.Accent,
-                        title = cat.label,
+                        title = cat.title,
                         hint = if (cat == DataCategory.HEALTH_CONDITION) {
-                            "Diagnoses. Let through so a report can be explained; mask them before sending one to an employer or insurer"
+                            stringResource(R.string.fw_condition_hint)
                         } else {
-                            "Shown to others as <${cat.tokenPrefix}_1>"
+                            stringResource(R.string.fw_shown_as, "<${cat.tokenPrefix}_1>")
                         },
-                        action = action.label,
+                        action = action.title,
                         strong = action == DisclosureAction.BLOCK,
                         last = i == DataCategory.entries.lastIndex,
                     ) { onPolicy(policy.with(cat, nextDisclosure(action))) }
                 }
             }
             Text(
-                "Applies to the Airlock and to “Mask with Parda” in any app's text menu.",
+                stringResource(R.string.fw_applies),
                 style = MaterialTheme.typography.bodyMedium, color = Frost.Ink2,
             )
         }
@@ -126,8 +132,11 @@ fun FirewallScreen(policy: Policy, onPolicy: (Policy) -> Unit) {
 @Composable
 private fun RuleRow(dot: Color, title: String, hint: String, action: String, strong: Boolean, last: Boolean, onCycle: () -> Unit) {
     Column {
+        // The whole row changes the rule, and a screen reader reads it as one: rule, hint, action.
         Row(
-            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
+            Modifier.fillMaxWidth()
+                .clickable(role = Role.Button, onClickLabel = stringResource(R.string.fw_change), onClick = onCycle)
+                .padding(horizontal = 16.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
@@ -136,7 +145,7 @@ private fun RuleRow(dot: Color, title: String, hint: String, action: String, str
                 Text(title, style = MaterialTheme.typography.titleMedium)
                 Text(hint, style = MaterialTheme.typography.bodyMedium, color = Frost.Ink2)
             }
-            Pill(action, strong = strong, onClick = onCycle)
+            Pill(action, strong = strong)
         }
         if (!last) HorizontalDivider(color = Frost.Ink.copy(alpha = 0.06f))
     }
@@ -150,6 +159,6 @@ private fun nextCheckout(kind: DarkPatternKind, current: CheckoutAction): Checko
 private fun nextDisclosure(current: DisclosureAction): DisclosureAction =
     DisclosureAction.entries[(current.ordinal + 1) % DisclosureAction.entries.size]
 
-private fun appName(context: Context, pkg: String): String = if (pkg == context.packageName) "Demo stores" else runCatching {
+private fun appName(context: Context, pkg: String): String = if (pkg == context.packageName) context.getString(R.string.demo_stores) else runCatching {
     context.packageManager.getApplicationLabel(context.packageManager.getApplicationInfo(pkg, 0)).toString()
 }.getOrDefault(pkg)

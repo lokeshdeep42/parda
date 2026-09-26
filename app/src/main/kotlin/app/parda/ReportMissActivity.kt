@@ -1,5 +1,8 @@
 package app.parda
 
+import androidx.compose.ui.res.pluralStringResource
+import app.parda.ui.components.asHeading
+import androidx.compose.ui.res.stringResource
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
@@ -57,16 +60,15 @@ class ReportMissActivity : ComponentActivity() {
         var picked by remember { mutableStateOf<Seen?>(null) }
         var note by remember { mutableStateOf("") }
         ScreenColumn {
-            Text("Report a miss", style = MaterialTheme.typography.headlineLarge)
+            Text(stringResource(R.string.rm_title), style = MaterialTheme.typography.headlineLarge, modifier = Modifier.asHeading())
             Text(
-                "Pick the screen Parda got wrong. The report shows what Parda read there, with personal details masked, and you choose where to send it.",
+                stringResource(R.string.rm_sub),
                 style = MaterialTheme.typography.bodyLarge, color = Frost.Ink2,
             )
             if (screens.isEmpty()) {
                 GlassCard(padding = 16.dp) {
                     Text(
-                        "No screens with prices yet. Open the checkout Parda missed, come back here, and it will be listed. " +
-                            "Screens are held in memory only and forgotten when the app closes.",
+                        stringResource(R.string.rm_empty),
                         style = MaterialTheme.typography.bodyMedium,
                     )
                 }
@@ -77,8 +79,8 @@ class ReportMissActivity : ComponentActivity() {
                     Text((if (chosen) "✓ " else "") + s.label, style = MaterialTheme.typography.titleMedium)
                     Text(
                         "${DateUtils.getRelativeTimeSpanString(s.at)} · " +
-                            (if (s.checkout) "read as a checkout" else "not read as a checkout") +
-                            " · ${s.findings.size} finding(s)",
+                            (if (s.checkout) stringResource(R.string.rm_read_as) else stringResource(R.string.rm_not_read_as)) +
+                            " · " + pluralStringResource(R.plurals.pl_findings, s.findings.size, s.findings.size),
                         style = MaterialTheme.typography.bodyMedium, color = Frost.Ink2,
                     )
                 }
@@ -87,18 +89,18 @@ class ReportMissActivity : ComponentActivity() {
                 OutlinedTextField(
                     value = note, onValueChange = { note = it },
                     modifier = Modifier.fillMaxWidth().heightIn(min = 90.dp),
-                    label = { Text("What did Parda miss? (e.g. a donation was already added)") },
+                    label = { Text(stringResource(R.string.rm_note_label)) },
                 )
-                PrimaryButton("Share the report", onClick = { share(s, note) })
+                PrimaryButton(stringResource(R.string.rm_share), onClick = { share(s, note) })
             }
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                SectionLabel("What the report holds")
+                SectionLabel(stringResource(R.string.rm_holds))
                 Text(
-                    "The app's name, the time, what Parda found, your note, and the text Parda read on that screen, with names, phone numbers, addresses and IDs masked. Prices stay.",
+                    stringResource(R.string.rm_holds_desc),
                     style = MaterialTheme.typography.bodyMedium, color = Frost.Ink2,
                 )
             }
-            QuietButton("Close", onClick = ::finish)
+            QuietButton(stringResource(R.string.close), onClick = ::finish)
         }
     }
 
@@ -135,7 +137,7 @@ class ReportMissActivity : ComponentActivity() {
                     .putExtra(Intent.EXTRA_SUBJECT, "Parda missed something in ${s.label}")
                     .putExtra(Intent.EXTRA_STREAM, uri)
                     .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION),
-                "Send the report",
+                getString(R.string.rm_send),
             ),
         )
     }

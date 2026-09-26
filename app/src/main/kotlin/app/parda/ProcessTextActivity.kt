@@ -43,7 +43,7 @@ class ProcessTextActivity : Activity() {
         }
         Toast.makeText(
             this,
-            if (withheld > 0) "Parda masked $withheld item(s)" else "Nothing sensitive found",
+            if (withheld > 0) resources.getQuantityString(R.plurals.pl_masked_items, withheld, withheld) else getString(R.string.qm_nothing_personal),
             Toast.LENGTH_SHORT,
         ).show()
         setResult(RESULT_OK, Intent().putExtra(Intent.EXTRA_PROCESS_TEXT, result.sanitized))

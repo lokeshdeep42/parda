@@ -1,5 +1,15 @@
 package app.parda.ui.screens
 
+import app.parda.ui.components.asHeading
+import app.parda.ui.explanationText
+import app.parda.ui.plural
+import app.parda.ui.str
+import app.parda.R
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import app.parda.ui.title
 import android.text.format.DateUtils
 import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.DropdownMenuItem
@@ -108,7 +118,7 @@ fun AirlockScreen(initialText: String?, initialImage: Uri? = null) {
     var image by remember { mutableStateOf<ImageAirlock.Result?>(null) }
     var imageName by remember { mutableStateOf("") }
     fun openImage(uri: Uri, scannedPdf: Boolean = false) {
-        fileNote = "Reading the text in this image, on this phone…"
+        fileNote = str(R.string.air_reading_image)
         scope.launch {
             val read = withContext(Dispatchers.IO) {
                 runCatching {
@@ -122,7 +132,7 @@ fun AirlockScreen(initialText: String?, initialImage: Uri? = null) {
                 fileNote = null
             }.onFailure {
                 android.util.Log.w("PardaOCR", "could not read image", it)
-                fileNote = "Could not read that image."
+                fileNote = str(R.string.air_image_failed)
             }
         }
     }
@@ -136,7 +146,7 @@ fun AirlockScreen(initialText: String?, initialImage: Uri? = null) {
         }
         image = null
         run {
-            fileNote = "Reading…"
+            fileNote = str(R.string.air_reading)
             scope.launch {
                 val read = withContext(Dispatchers.IO) { runCatching { DocumentReader.read(context, uri) } }
                 read.onSuccess { r ->
@@ -159,7 +169,7 @@ fun AirlockScreen(initialText: String?, initialImage: Uri? = null) {
                 }.onFailure {
                     // No text layer: a scanned PDF. Read it with OCR like a photo instead.
                     if (it is DocumentReader.NoText && it.pdf) openImage(uri, scannedPdf = true)
-                    else fileNote = (it as? DocumentReader.Unsupported)?.message ?: "Could not read that file."
+                    else fileNote = (it as? DocumentReader.Unsupported)?.message ?: str(R.string.air_file_failed)
                 }
             }
         }
@@ -167,8 +177,8 @@ fun AirlockScreen(initialText: String?, initialImage: Uri? = null) {
 
     ScreenColumn {
         Column {
-            Text("Airlock", style = MaterialTheme.typography.headlineLarge)
-            Text("Mask it before you share it", style = MaterialTheme.typography.bodyLarge, color = Frost.Ink2)
+            Text(stringResource(R.string.nav_airlock), style = MaterialTheme.typography.headlineLarge, modifier = Modifier.asHeading())
+            Text(stringResource(R.string.air_sub), style = MaterialTheme.typography.bodyLarge, color = Frost.Ink2)
         }
 
         val installed = remember(model) { store.installedModels().map { it.nameWithoutExtension to it.length() } }
@@ -185,8 +195,8 @@ fun AirlockScreen(initialText: String?, initialImage: Uri? = null) {
 
         GlassCard(padding = 16.dp) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                SectionLabel("Inside this phone")
-                Pill("Open file", onClick = { pickFile.launch(DocumentReader.MIME_TYPES + "image/*") })
+                SectionLabel(stringResource(R.string.air_inside))
+                Pill(stringResource(R.string.air_open_file), onClick = { pickFile.launch(DocumentReader.MIME_TYPES + "image/*") })
             }
             fileNote?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = Frost.Ink2) }
             OutlinedTextField(
@@ -196,15 +206,15 @@ fun AirlockScreen(initialText: String?, initialImage: Uri? = null) {
                 // question and the Ask button off the bottom of the screen.
                 modifier = Modifier.fillMaxWidth().heightIn(min = 160.dp, max = 320.dp),
                 textStyle = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
-                label = { Text("Text you are about to send") },
+                label = { Text(stringResource(R.string.air_text_label)) },
                 colors = fieldColors(),
             )
             OutlinedTextField(
                 value = request,
                 onValueChange = { request = it; decision = null },
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text("What do you want to know?") },
-                placeholder = { Text("Ask about this document, or tap a suggestion") },
+                label = { Text(stringResource(R.string.air_question_label)) },
+                placeholder = { Text(stringResource(R.string.air_question_hint)) },
                 colors = fieldColors(),
             )
             // Questions that fit whatever is loaded: a statement, a lease, a payroll export, an ID.
@@ -213,7 +223,7 @@ fun AirlockScreen(initialText: String?, initialImage: Uri? = null) {
                 suggestions.forEach { q -> Pill(q.label, strong = request == q.request, onClick = { request = q.request; decision = null }) }
             }
             PrimaryButton(
-                if (thinking) "Thinking on this phone…" else "Ask the agent",
+                if (thinking) stringResource(R.string.air_thinking) else stringResource(R.string.air_ask),
                 enabled = document.isNotBlank() && !thinking,
                 onClick = {
                     thinking = true
@@ -229,7 +239,7 @@ fun AirlockScreen(initialText: String?, initialImage: Uri? = null) {
                                 full = whole, pages = if (fromFile) pages else null,
                             ) { piece -> scope.launch(Dispatchers.Main) { streamed += piece } }
                         }
-                        val planner = d.plannedBy.label +
+                        val planner = d.plannedBy.title +
                             if (d.plannedBy == Planner.MODEL) " (${modelName(model) ?: "model"})" else ""
                         decision = d
                         thinking = false
@@ -257,7 +267,7 @@ fun AirlockScreen(initialText: String?, initialImage: Uri? = null) {
         when (val d = decision) {
             null -> if (thinking && streamed.isNotBlank()) {
                 GlassCard(padding = 16.dp) {
-                    SectionLabel("Writing on this phone…")
+                    SectionLabel(stringResource(R.string.air_writing))
                     Text(streamed, style = MaterialTheme.typography.bodyLarge)
                 }
             } else if (!thinking) {
@@ -265,39 +275,39 @@ fun AirlockScreen(initialText: String?, initialImage: Uri? = null) {
             }
             is GateDecision.HeldLocally -> {
                 NightCard {
-                    SectionLabel("Answered on this phone", Frost.NightInk2)
-                    Text("Nothing needed to leave — not even a surrogate.", color = Color.White, style = MaterialTheme.typography.bodyLarge)
-                    Text("Planned by ${d.plannedBy.label}", color = Frost.NightInk2, style = MaterialTheme.typography.bodyMedium)
+                    SectionLabel(stringResource(R.string.air_answered), Frost.NightInk2)
+                    Text(stringResource(R.string.air_nothing_left), color = Color.White, style = MaterialTheme.typography.bodyLarge)
+                    Text(stringResource(R.string.air_planned_by, d.plannedBy.title), color = Frost.NightInk2, style = MaterialTheme.typography.bodyMedium)
                 }
                 GlassCard(padding = 16.dp) {
-                    SectionLabel("Answer")
+                    SectionLabel(stringResource(R.string.air_answer))
                     SelectionContainer { Text(d.answer, style = MaterialTheme.typography.bodyLarge) }
                 }
             }
             is GateDecision.HandedBack -> {
                 NightCard {
-                    SectionLabel("Handed back sanitized", Frost.NightInk2)
+                    SectionLabel(stringResource(R.string.air_handed_back), Frost.NightInk2)
                     Text(
-                        "${d.reason.explanation} Parda prepared a safe copy. It did not send it — it has no way to.",
+                        stringResource(R.string.air_handed_back_expl, d.reason.explanationText),
                         color = Color.White, style = MaterialTheme.typography.bodyLarge,
                     )
                 }
                 GlassCard(padding = 16.dp) {
-                    SectionLabel("What you can take outside · ${d.result.vault.withheld} withheld")
+                    SectionLabel(stringResource(R.string.air_take_outside, d.result.vault.withheld))
                     if (preview != null && document == preview && (fullText?.length ?: 0) > document.length) {
-                        Text("This copy is the text box: the first 20,000 characters of the file.", style = MaterialTheme.typography.bodyMedium, color = Frost.Ink2)
+                        Text(stringResource(R.string.air_copy_is_box), style = MaterialTheme.typography.bodyMedium, color = Frost.Ink2)
                     }
                     Mono(d.outbound)
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Pill("Copy", strong = true, onClick = { clipboard.setText(AnnotatedString(d.outbound)) })
-                        Pill("Share…", onClick = {
+                        Pill(stringResource(R.string.copy), strong = true, onClick = { clipboard.setText(AnnotatedString(d.outbound)) })
+                        Pill(stringResource(R.string.share_dots), onClick = {
                             val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, d.outbound)
-                            context.startActivity(Intent.createChooser(send, "Send sanitized text"))
+                            context.startActivity(Intent.createChooser(send, str(R.string.air_send_sanitized)))
                         })
                     }
                 }
                 GlassCard(padding = 16.dp) {
-                    SectionLabel("Vault — never leaves this phone")
+                    SectionLabel(stringResource(R.string.air_vault))
                     val entries = d.result.vault.entries
                     entries.take(VAULT_ROWS).forEach { e ->
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -306,28 +316,28 @@ fun AirlockScreen(initialText: String?, initialImage: Uri? = null) {
                         }
                     }
                     if (entries.size > VAULT_ROWS) {
-                        Text("and ${entries.size - VAULT_ROWS} more, all held on this phone", style = MaterialTheme.typography.bodyMedium, color = Frost.Ink2)
+                        Text(stringResource(R.string.air_vault_more, entries.size - VAULT_ROWS), style = MaterialTheme.typography.bodyMedium, color = Frost.Ink2)
                     }
                 }
                 GlassCard(padding = 16.dp) {
-                    SectionLabel("Bring the reply back")
+                    SectionLabel(stringResource(R.string.air_bring_back))
                     Text(
-                        "No rush: this vault is kept on the phone for a day, encrypted, so you can paste the answer here later too.",
+                        stringResource(R.string.air_no_rush),
                         style = MaterialTheme.typography.bodyMedium, color = Frost.Ink2,
                     )
                     OutlinedTextField(
                         value = reply,
                         onValueChange = { reply = it },
                         modifier = Modifier.fillMaxWidth().heightIn(min = 100.dp),
-                        label = { Text("Paste the outside model's answer") },
+                        label = { Text(stringResource(R.string.air_paste_answer)) },
                         colors = fieldColors(),
                     )
                     if (reply.isNotBlank()) {
-                        SectionLabel("Reads back to you as")
+                        SectionLabel(stringResource(R.string.air_reads_back))
                         SelectionContainer { Text(d.result.vault.rehydrate(reply), style = MaterialTheme.typography.bodyLarge) }
                     }
                 }
-                QuietButton("Start over", onClick = { decision = null; reply = "" })
+                QuietButton(stringResource(R.string.air_start_over), onClick = { decision = null; reply = "" })
             }
         }
     }
@@ -348,33 +358,32 @@ private fun ReplyCard() {
     var reply by rememberSaveable { mutableStateOf("") }
 
     GlassCard(padding = 16.dp) {
-        SectionLabel("Bring a reply back")
+        SectionLabel(stringResource(R.string.air_bring_a_reply))
         val n = archive.handBacks.size
         Text(
-            "$n cop${if (n == 1) "y" else "ies"} you took outside in the last day ${if (n == 1) "is" else "are"} remembered here, encrypted. " +
-                "Paste an answer that says <PERSON_1> and it reads with the real name.",
+            pluralStringResource(R.plurals.pl_copies_kept, n, n) + " " + stringResource(R.string.air_reply_hint),
             style = MaterialTheme.typography.bodyMedium, color = Frost.Ink2,
         )
         OutlinedTextField(
             value = reply,
             onValueChange = { reply = it },
             modifier = Modifier.fillMaxWidth().heightIn(min = 90.dp),
-            label = { Text("The outside model's answer") },
+            label = { Text(stringResource(R.string.air_outside_answer)) },
             colors = fieldColors(),
         )
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Pill("Paste", onClick = { reply = clipboard.getText()?.text.orEmpty() })
-            Pill("Forget all now", onClick = { store.vaults.forgetAll(); reply = "" })
+            Pill(stringResource(R.string.paste), onClick = { reply = clipboard.getText()?.text.orEmpty() })
+            Pill(stringResource(R.string.air_forget_all), onClick = { store.vaults.forgetAll(); reply = "" })
         }
         if (reply.isNotBlank()) {
             val match = archive.bestFor(reply)
             if (match == null) {
-                Text("This answer mentions none of the placeholders Parda made.", style = MaterialTheme.typography.bodyMedium, color = Frost.Ink2)
+                Text(stringResource(R.string.air_no_placeholders), style = MaterialTheme.typography.bodyMedium, color = Frost.Ink2)
             } else {
                 val restored = match.vault.rehydrate(reply)
-                SectionLabel("Reads back to you as · from “${match.title.take(40)}”, ${DateUtils.getRelativeTimeSpanString(match.at)}")
+                SectionLabel(stringResource(R.string.air_reads_back_from, match.title.take(40), DateUtils.getRelativeTimeSpanString(match.at)))
                 SelectionContainer { Text(restored, style = MaterialTheme.typography.bodyLarge) }
-                Pill("Copy", strong = true, onClick = { clipboard.setText(AnnotatedString(restored)) })
+                Pill(stringResource(R.string.copy), strong = true, onClick = { clipboard.setText(AnnotatedString(restored)) })
             }
         }
     }
@@ -394,24 +403,24 @@ private fun ImageCard(img: ImageAirlock.Result, name: String, onClose: () -> Uni
 
     GlassCard(padding = 16.dp) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            SectionLabel("Masked copy · original untouched")
-            Pill("Close", onClick = onClose)
+            SectionLabel(stringResource(R.string.air_masked_copy_title))
+            Pill(stringResource(R.string.close), onClick = onClose)
         }
-        Text("$name · read on this phone", style = MaterialTheme.typography.bodyMedium, color = Frost.Ink2)
+        Text(stringResource(R.string.air_read_on_phone_name, name), style = MaterialTheme.typography.bodyMedium, color = Frost.Ink2)
         Image(
-            preview.asImageBitmap(), contentDescription = "Masked preview of $name",
+            preview.asImageBitmap(), contentDescription = stringResource(R.string.air_masked_preview_of, name),
             modifier = Modifier.fillMaxWidth().heightIn(max = 420.dp).clip(RoundedCornerShape(18.dp)),
             contentScale = ContentScale.Fit,
         )
         if (plan.fields.isEmpty()) {
             Text(
-                "No personal data found in this image. If it is blurry or at an angle, try a straighter photo.",
+                stringResource(R.string.air_no_data_in_image),
                 style = MaterialTheme.typography.bodyLarge,
             )
         }
         plan.categories.forEach { c ->
             val fields = plan.fields.filter { it.category == c }
-            val label = c.label + (if (fields.any { it.keepsLast4 }) " · keep last 4" else "") + " · ${fields.size}"
+            val label = c.title + (if (fields.any { it.keepsLast4 }) stringResource(R.string.air_keep_last_4) else "") + " · ${fields.size}"
             // The whole row is the target, not just the box.
             Row(
                 Modifier.fillMaxWidth().toggleable(
@@ -425,7 +434,7 @@ private fun ImageCard(img: ImageAirlock.Result, name: String, onClose: () -> Uni
                 Text(label, style = MaterialTheme.typography.bodyLarge)
             }
         }
-        PrimaryButton("Share masked copy", enabled = plan.fields.isNotEmpty(), onClick = {
+        PrimaryButton(stringResource(R.string.air_share_masked), enabled = plan.fields.isNotEmpty(), onClick = {
             val uri = ImageAirlock.export(context, preview)
             val count = plan.fields.count { it.category in masked }
             store.record(
@@ -435,7 +444,7 @@ private fun ImageCard(img: ImageAirlock.Result, name: String, onClose: () -> Uni
             )
             val send = Intent(Intent.ACTION_SEND).setType("image/png").putExtra(Intent.EXTRA_STREAM, uri)
                 .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            context.startActivity(Intent.createChooser(send, "Send masked image"))
+            context.startActivity(Intent.createChooser(send, str(R.string.air_send_masked_image)))
         })
     }
 }
@@ -445,26 +454,26 @@ private fun ImageCard(img: ImageAirlock.Result, name: String, onClose: () -> Uni
 private fun ModelCard(model: ModelStatus, installed: List<Pair<String, Long>>, onImport: () -> Unit, onPick: (String) -> Unit) {
     var menu by remember { mutableStateOf(false) }
     GlassCard(padding = 16.dp) {
-        SectionLabel("Local model")
+        SectionLabel(stringResource(R.string.air_local_model))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 val (title, detail) = when (model) {
-                    is ModelStatus.Resting -> model.name to "Resting to free memory · wakes in about a second when you ask" +
-                        if (installed.size > 1) " · ${installed.size} models installed" else ""
-                    is ModelStatus.Ready -> model.name to "Running on this phone's CPU · loaded in ${model.loadMillis} ms" +
-                        if (installed.size > 1) " · ${installed.size} models installed" else ""
-                    is ModelStatus.Loading -> model.name to "Loading…"
-                    is ModelStatus.Failed -> model.name to "Could not load: ${model.reason}. Using the rule-based agent."
-                    ModelStatus.Missing -> "Rule-based agent" to "Import a .gguf (e.g. Hammer2.1-1.5B Q4) to plan with a local LLM."
+                    is ModelStatus.Resting -> model.name to stringResource(R.string.air_model_resting) +
+                        if (installed.size > 1) stringResource(R.string.air_models_installed, installed.size) else ""
+                    is ModelStatus.Ready -> model.name to stringResource(R.string.air_model_ready, model.loadMillis.toInt()) +
+                        if (installed.size > 1) stringResource(R.string.air_models_installed, installed.size) else ""
+                    is ModelStatus.Loading -> model.name to stringResource(R.string.air_model_loading)
+                    is ModelStatus.Failed -> model.name to stringResource(R.string.air_model_failed, model.reason)
+                    ModelStatus.Missing -> stringResource(R.string.air_rule_agent) to stringResource(R.string.air_import_hint)
                 }
                 Text(title, style = MaterialTheme.typography.titleMedium)
                 Text(detail, style = MaterialTheme.typography.bodyMedium, color = Frost.Ink2)
             }
             if (model is ModelStatus.Missing || model is ModelStatus.Failed) {
-                Pill("Import", strong = true, onClick = onImport)
+                Pill(stringResource(R.string.air_import), strong = true, onClick = onImport)
             } else if ((model is ModelStatus.Ready || model is ModelStatus.Resting) && installed.size > 1) {
                 Box {
-                    Pill("Switch", onClick = { menu = true })
+                    Pill(stringResource(R.string.air_switch), onClick = { menu = true })
                     // Every installed model, in the benchmark's order; the one running is ticked.
                     DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                         installed.forEach { (name, bytes) ->
@@ -473,7 +482,7 @@ private fun ModelCard(model: ModelStatus, installed: List<Pair<String, Long>>, o
                                 onClick = { menu = false; if (name != modelName(model)) onPick(name) },
                             )
                         }
-                        DropdownMenuItem(text = { Text("Import another .gguf") }, onClick = { menu = false; onImport() })
+                        DropdownMenuItem(text = { Text(stringResource(R.string.air_import_another)) }, onClick = { menu = false; onImport() })
                     }
                 }
             }
@@ -484,11 +493,11 @@ private fun ModelCard(model: ModelStatus, installed: List<Pair<String, Long>>, o
 /** Says plainly how much of the file was read and what each part of the screen covers. */
 private fun fileNote(r: DocumentReader.Result): String {
     val parts = mutableListOf(r.name)
-    r.pages?.let { parts += "$it page" + if (it == 1) "" else "s" }
-    parts += "read on this phone"
+    r.pages?.let { parts += plural(R.plurals.pl_pages, it) }
+    parts += str(R.string.air_read_on_phone)
     if (r.truncated) {
-        parts += if (r.complete) "summaries cover the whole file; the box shows the first 20,000 characters"
-        else "reading the rest for the summary…"
+        parts += if (r.complete) str(R.string.air_whole_file)
+        else str(R.string.air_reading_rest)
     }
     return parts.joinToString(" · ")
 }

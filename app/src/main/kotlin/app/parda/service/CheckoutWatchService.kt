@@ -1,5 +1,9 @@
 package app.parda.service
 
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.foundation.clickable
+import app.parda.ui.title
 import android.Manifest
 import android.accessibilityservice.AccessibilityService
 import android.app.PendingIntent
@@ -201,12 +205,12 @@ class CheckoutWatchService : AccessibilityService() {
             this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE,
         )
         val title = if (removed.isNotEmpty()) {
-            "Parda removed ${removed.size} extra(s) in $app, as you asked" +
-                removed.sumOf { it.cost }.let { if (it > 0) " · ${Money.format(it)} kept" else "" }
+            resources.getQuantityString(R.plurals.pl_notif_removed, removed.size, removed.size, app) +
+                removed.sumOf { it.cost }.let { if (it > 0) getString(R.string.notif_kept, Money.format(it)) else "" }
         } else {
-            "Parda flagged ${flagged.size} thing(s) in $app"
+            resources.getQuantityString(R.plurals.pl_notif_flagged, flagged.size, flagged.size, app)
         }
-        val text = (removed.map { it.evidence } + flagged.map { it.kind.label }).joinToString(" · ")
+        val text = (removed.map { it.evidence } + flagged.map { it.kind.title }).joinToString(" · ")
         NotificationManagerCompat.from(this).notify(
             NOTIFICATION_ID,
             NotificationCompat.Builder(this, PardaApp.CHANNEL_INTERCEPTS)
@@ -219,7 +223,7 @@ class CheckoutWatchService : AccessibilityService() {
         )
     }
 
-    private fun appLabel(pkg: String): String = if (pkg == packageName) "the demo store" else runCatching {
+    private fun appLabel(pkg: String): String = if (pkg == packageName) getString(R.string.the_demo_store) else runCatching {
         packageManager.getApplicationLabel(packageManager.getApplicationInfo(pkg, 0)).toString()
     }.getOrDefault(pkg)
 

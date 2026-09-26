@@ -1,5 +1,13 @@
 package app.parda.ui.screens
 
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import app.parda.ui.components.asHeading
+import androidx.compose.ui.platform.LocalContext
+import app.parda.ui.AppLanguage
+import app.parda.ui.str
+import app.parda.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -64,11 +72,17 @@ fun HomeScreen(
 ) {
     val serviceOn = shield.enabled && shield.running
     ScreenColumn {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        val context = LocalContext.current
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             StrokeIcon(Icons.Shield, size = 22.dp)
             Text("parda", style = MaterialTheme.typography.titleLarge)
+            Spacer(Modifier.weight(1f))
+            if (AppLanguage.switchable) {
+                // Named in the language it switches to, so it can be found by someone who reads only that one.
+                Pill(if (AppLanguage.isHindi(context)) "English" else "हिंदी", onClick = { AppLanguage.toggle(context) })
+            }
         }
-        Text("Your checkout\nshield", style = MaterialTheme.typography.headlineLarge)
+        Text(stringResource(R.string.home_title), style = MaterialTheme.typography.headlineLarge, modifier = Modifier.asHeading())
 
         GlassCard {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
@@ -78,30 +92,30 @@ fun HomeScreen(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Spacer(Modifier.width(12.dp)); Dot(Frost.OkDot, 8.dp)
-                        Text("  Active · on-device", style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 7.dp, bottom = 7.dp, end = 12.dp))
+                        Text("  " + stringResource(R.string.home_active), style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 7.dp, bottom = 7.dp, end = 12.dp))
                     }
-                    Pill("Try a demo checkout", strong = true, onClick = onTryDemo)
+                    Pill(stringResource(R.string.home_try_demo), strong = true, onClick = onTryDemo)
                 } else if (shield.enabled) {
-                    Pill("Shield stopped — fix", strong = true, onClick = onEnableService)
+                    Pill(stringResource(R.string.home_stopped_fix), strong = true, onClick = onEnableService)
                 } else {
-                    Pill("Shield is off — turn on", strong = true, onClick = onEnableService)
+                    Pill(stringResource(R.string.home_off_turn_on), strong = true, onClick = onEnableService)
                 }
             }
             ShieldNote(shield, onBackgroundSettings, onNotifications)
             if (serviceOn) {
                 Text(
-                    "Parda missed something? Report it",
+                    stringResource(R.string.home_report_miss),
                     style = MaterialTheme.typography.bodyMedium, color = Frost.Ink2,
                     modifier = Modifier.clickable(role = Role.Button, onClick = onReportMiss),
                 )
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Stat("${totals.patternsCaught}", "Dark patterns caught", Modifier.weight(1f))
-                Stat(Money.format(totals.savedPaise), "Saved", Modifier.weight(1f))
+                Stat("${totals.patternsCaught}", stringResource(R.string.stat_caught), Modifier.weight(1f))
+                Stat(Money.format(totals.savedPaise), stringResource(R.string.stat_saved), Modifier.weight(1f))
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Stat("${totals.fieldsMasked}", "Personal fields masked", Modifier.weight(1f))
-                Stat(formatBytes(egressBytes), "Sent to any server", Modifier.weight(1f))
+                Stat("${totals.fieldsMasked}", stringResource(R.string.stat_masked), Modifier.weight(1f))
+                Stat(formatBytes(egressBytes), stringResource(R.string.stat_sent), Modifier.weight(1f))
             }
             Row(Modifier.fillMaxWidth().height(8.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 listOf(
@@ -115,11 +129,11 @@ fun HomeScreen(
 
         val lastA = entries.lastOrNull { it.channel == Channel.A }
         NightCard(Modifier.clickable(role = Role.Button, onClick = onOpenLedger)) {
-            SectionLabel("Last intercept", Frost.NightInk2)
+            SectionLabel(stringResource(R.string.home_last_intercept), Frost.NightInk2)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(
-                        lastA?.detail ?: "Nothing yet. Shop as usual — Parda reads the checkout screen.",
+                        lastA?.detail ?: stringResource(R.string.home_nothing_yet),
                         style = MaterialTheme.typography.titleLarge.copy(fontSize = MaterialTheme.typography.titleMedium.fontSize),
                         color = Color.White,
                     )
@@ -130,7 +144,7 @@ fun HomeScreen(
                 }
                 Spacer(Modifier.width(12.dp))
                 Box(Modifier.size(52.dp).clip(CircleShape).background(Color.White), contentAlignment = Alignment.Center) {
-                    StrokeIcon(Icons.Chevron, tint = Frost.Night, contentDescription = "Open ledger")
+                    StrokeIcon(Icons.Chevron, tint = Frost.Night, contentDescription = stringResource(R.string.home_open_ledger))
                 }
             }
         }
@@ -143,7 +157,7 @@ fun HomeScreen(
                     }
                     Column(Modifier.weight(1f)) {
                         Text(lastB.detail, style = MaterialTheme.typography.bodyLarge)
-                        Text("Airlock · ${timeAgo(lastB.timeMillis)}", style = MaterialTheme.typography.bodyMedium, color = Frost.Ink2)
+                        Text(stringResource(R.string.home_airlock_ago, timeAgo(lastB.timeMillis)), style = MaterialTheme.typography.bodyMedium, color = Frost.Ink2)
                     }
                 }
             }
@@ -156,13 +170,11 @@ fun HomeScreen(
 @Composable
 private fun ShieldNote(shield: ShieldStatus, onBackground: () -> Unit, onNotifications: () -> Unit) {
     val (text, action) = when {
-        !shield.enabled -> "Parda can't see checkouts until you allow it in Accessibility." to null
-        !shield.running -> "It is switched on, but Android stopped it. In Accessibility, turn Parda off and on; " +
-            "then let Parda run in the background so it is not stopped again." to ("Background settings" to onBackground)
-        !shield.notificationsOn -> "Notifications are off, so flags that don't pause a checkout can't reach you." to
-            ("Allow" to onNotifications)
-        shield.lastEventAt > 0 -> "Watching · last read a screen ${timeAgo(shield.lastEventAt)}." to null
-        else -> "Watching · open any shopping app and Parda reads its checkout." to null
+        !shield.enabled -> stringResource(R.string.note_off) to null
+        !shield.running -> stringResource(R.string.note_stopped) to (stringResource(R.string.note_background_settings) to onBackground)
+        !shield.notificationsOn -> stringResource(R.string.note_notifications_off) to (stringResource(R.string.allow) to onNotifications)
+        shield.lastEventAt > 0 -> stringResource(R.string.note_watching_last, timeAgo(shield.lastEventAt)) to null
+        else -> stringResource(R.string.note_watching) to null
     }
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
         Text(text, style = MaterialTheme.typography.bodyMedium, color = if (action != null || !shield.enabled) Frost.WarnInk else Frost.Ink2, modifier = Modifier.weight(1f))
@@ -179,9 +191,9 @@ internal fun formatBytes(b: Long): String = when {
 internal fun timeAgo(millis: Long): String {
     val s = (System.currentTimeMillis() - millis) / 1000
     return when {
-        s < 60 -> "just now"
-        s < 3600 -> "${s / 60} min ago"
-        s < 86400 -> "${s / 3600} hr ago"
-        else -> "${s / 86400} d ago"
+        s < 60 -> str(R.string.time_now)
+        s < 3600 -> str(R.string.time_min, (s / 60).toInt())
+        s < 86400 -> str(R.string.time_hr, (s / 3600).toInt())
+        else -> str(R.string.time_day, (s / 86400).toInt())
     }
 }

@@ -1,5 +1,10 @@
 package app.parda
 
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import app.parda.ui.title
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Intent
@@ -75,10 +80,10 @@ class QuickMaskActivity : ComponentActivity() {
         when {
             intent.action == ACTION_MASK_CLIPBOARD -> clipboardPending = true
             intent.action == Intent.ACTION_SEND && intent.type?.startsWith("image/") == true ->
-                intent.stream()?.let(::maskPhoto) ?: run { state = State.Empty("Nothing to mask was shared.") }
+                intent.stream()?.let(::maskPhoto) ?: run { state = State.Empty(getString(R.string.qm_nothing_shared)) }
             intent.action == Intent.ACTION_SEND ->
                 intent.getStringExtra(Intent.EXTRA_TEXT)?.takeIf { it.isNotBlank() }?.let { maskText(it, fromClipboard = false) }
-                    ?: run { state = State.Empty("Nothing to mask was shared.") }
+                    ?: run { state = State.Empty(getString(R.string.qm_nothing_shared)) }
             else -> { finish(); return }
         }
         setContent { PardaTheme { Sheet() } }
@@ -90,7 +95,7 @@ class QuickMaskActivity : ComponentActivity() {
         clipboardPending = false
         val clip = getSystemService(ClipboardManager::class.java).primaryClip
         val text = clip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.coerceToText(this)?.toString()
-        if (text.isNullOrBlank()) state = State.Empty("The clipboard is empty.") else maskText(text, fromClipboard = true)
+        if (text.isNullOrBlank()) state = State.Empty(getString(R.string.qm_clipboard_empty)) else maskText(text, fromClipboard = true)
     }
 
     private fun maskText(text: String, fromClipboard: Boolean) {
@@ -117,13 +122,13 @@ class QuickMaskActivity : ComponentActivity() {
                     val plan = r.plan
                     State.Photo(ImageAirlock.render(r.original, plan.boxes(plan.categories.toSet())), plan.fields.size)
                 },
-                onFailure = { State.Empty("Could not read that image.") },
+                onFailure = { State.Empty(getString(R.string.air_image_failed)) },
             )
         }
     }
 
     private fun share(send: Intent) {
-        startActivity(Intent.createChooser(send, "Send the masked copy"))
+        startActivity(Intent.createChooser(send, getString(R.string.qm_send)))
         finish()
     }
 
@@ -147,10 +152,10 @@ class QuickMaskActivity : ComponentActivity() {
                 verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
                 when (val s = state) {
-                    State.Reading -> Title("Reading on this phone…", "Nothing leaves while Parda looks.")
+                    State.Reading -> Title(stringResource(R.string.qm_reading), stringResource(R.string.qm_nothing_leaves))
                     is State.Empty -> {
-                        Title("Nothing to mask", s.why)
-                        QuietButton("Close", onClick = ::finish)
+                        Title(stringResource(R.string.qm_nothing_to_mask), s.why)
+                        QuietButton(stringResource(R.string.close), onClick = ::finish)
                     }
                     is State.Text -> TextResult(s)
                     is State.Photo -> PhotoResult(s)
@@ -170,10 +175,10 @@ class QuickMaskActivity : ComponentActivity() {
     @Composable
     private fun TextResult(s: State.Text) {
         Title(
-            if (s.hidden > 0) "Parda masked ${s.hidden} item(s)" else "Nothing personal found",
-            "Checked on this phone. Nothing was sent; the copy below is what you can send.",
+            if (s.hidden > 0) pluralStringResource(R.plurals.pl_masked_items, s.hidden, s.hidden) else stringResource(R.string.qm_nothing_personal),
+            stringResource(R.string.qm_checked),
         )
-        SectionLabel("Masked copy")
+        SectionLabel(stringResource(R.string.qm_masked_copy))
         Text(
             s.masked, fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.bodyMedium,
             modifier = Modifier.fillMaxWidth().heightIn(max = 280.dp).verticalScroll(rememberScrollState())
@@ -182,35 +187,35 @@ class QuickMaskActivity : ComponentActivity() {
         val copy = {
             getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("Masked by Parda", s.masked))
             // Android 13+ shows its own confirmation when the clipboard changes.
-            if (Build.VERSION.SDK_INT < 33) Toast.makeText(this, "Masked copy is on the clipboard", Toast.LENGTH_SHORT).show()
+            if (Build.VERSION.SDK_INT < 33) Toast.makeText(this, getString(R.string.qm_on_clipboard), Toast.LENGTH_SHORT).show()
             finish()
         }
         val send = { share(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, s.masked)) }
         if (s.fromClipboard) {
-            PrimaryButton("Replace the clipboard with it", onClick = copy)
-            QuietButton("Share it instead", onClick = send)
+            PrimaryButton(stringResource(R.string.qm_replace_clipboard), onClick = copy)
+            QuietButton(stringResource(R.string.qm_share_instead), onClick = send)
         } else {
-            PrimaryButton("Share masked copy", onClick = send)
-            QuietButton("Copy it", onClick = copy)
+            PrimaryButton(stringResource(R.string.air_share_masked), onClick = send)
+            QuietButton(stringResource(R.string.copy), onClick = copy)
         }
     }
 
     @Composable
     private fun PhotoResult(s: State.Photo) {
         Title(
-            if (s.covered > 0) "Parda covered ${s.covered} field(s)" else "Nothing personal found",
-            "Read on this phone. Your original photo is untouched.",
+            if (s.covered > 0) pluralStringResource(R.plurals.pl_covered_fields, s.covered, s.covered) else stringResource(R.string.qm_nothing_personal),
+            stringResource(R.string.qm_photo_read),
         )
         Image(
-            s.masked.asImageBitmap(), contentDescription = "Masked copy of the photo",
+            s.masked.asImageBitmap(), contentDescription = stringResource(R.string.qm_photo_desc),
             modifier = Modifier.fillMaxWidth().heightIn(max = 360.dp).clip(RoundedCornerShape(16.dp)),
         )
-        PrimaryButton("Share masked photo", enabled = s.covered > 0, onClick = {
+        PrimaryButton(stringResource(R.string.qm_share_photo), enabled = s.covered > 0, onClick = {
             store.record(Channel.B, Verdict.HANDED_BACK, "Covered ${s.covered} field(s) on a shared photo; masked copy handed to you", masked = s.covered)
             val uri = ImageAirlock.export(this, s.masked)
             share(Intent(Intent.ACTION_SEND).setType("image/png").putExtra(Intent.EXTRA_STREAM, uri).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION))
         })
-        QuietButton("Cancel", onClick = ::finish)
+        QuietButton(stringResource(R.string.cancel), onClick = ::finish)
     }
 
     private fun Intent.stream(): Uri? =

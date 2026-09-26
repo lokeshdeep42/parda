@@ -1,5 +1,11 @@
 package app.parda.service
 
+import androidx.compose.ui.res.pluralStringResource
+import app.parda.ui.components.asHeading
+import app.parda.ui.title
+import app.parda.ui.str
+import app.parda.R
+import androidx.compose.ui.res.stringResource
 import android.content.Intent
 import android.os.Bundle
 import androidx.compose.ui.semantics.semantics
@@ -74,6 +80,8 @@ class InterceptActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // The window title is what a screen reader announces when the sheet appears.
+        setTitle(R.string.sheet_title)
         intercept = InterceptState.current.value ?: run { finish(); return }
         setContent {
             val current = intercept ?: return@setContent
@@ -179,8 +187,8 @@ private fun Sheet(
                     .fillMaxWidth()
                     .height(28.dp)
                     .draggable(drag, Orientation.Vertical)
-                    .clickable(onClickLabel = if (height < high) "Expand" else "Shrink") { height = if (height < high) high else mid }
-                    .semantics { contentDescription = "Resize the sheet" },
+                    .clickable(onClickLabel = if (height < high) stringResource(R.string.sheet_expand) else stringResource(R.string.sheet_shrink)) { height = if (height < high) high else mid }
+                    .semantics { contentDescription = str(R.string.sheet_resize) },
                 contentAlignment = Alignment.Center,
             ) {
                 Box(Modifier.width(40.dp).height(5.dp).clip(CircleShape).background(Frost.Ink.copy(alpha = 0.25f)))
@@ -190,9 +198,9 @@ private fun Sheet(
                     StrokeIcon(Icons.Shield, tint = Color.White, size = 24.dp)
                 }
                 Column {
-                    Text("Parda paused this checkout", style = MaterialTheme.typography.titleLarge)
+                    Text(stringResource(R.string.sheet_title), style = MaterialTheme.typography.titleLarge, modifier = Modifier.asHeading())
                     Text(
-                        "${findings.size} thing(s) you didn't ask for · ${intercept.appLabel} · checked on this phone",
+                        stringResource(R.string.sheet_meta, pluralStringResource(R.plurals.pl_things, findings.size, findings.size), intercept.appLabel),
                         style = MaterialTheme.typography.bodyMedium, color = Frost.Ink2,
                     )
                 }
@@ -209,16 +217,16 @@ private fun Sheet(
 
             if (saving > 0 || monthly > 0) {
                 Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Text("You keep", style = MaterialTheme.typography.bodyLarge, color = Frost.Ink2)
+                    Text(stringResource(R.string.sheet_you_keep), style = MaterialTheme.typography.bodyLarge, color = Frost.Ink2)
                     Text(
-                        Money.format(saving) + (if (monthly > 0) " + ${Money.format(monthly)}/mo" else ""),
+                        Money.format(saving) + (if (monthly > 0) " + " + stringResource(R.string.per_month, Money.format(monthly)) else ""),
                         style = MaterialTheme.typography.headlineMedium,
                     )
                 }
                 if (monthly > 0) {
                     // A monthly charge reads small; the year it adds up to is what the user agrees to.
                     Text(
-                        "That's ${Money.format(monthly * 12)} a year you didn't choose.",
+                        stringResource(R.string.sheet_yearly, Money.format(monthly * 12)),
                         style = MaterialTheme.typography.bodyMedium, color = Frost.WarnInk,
                         modifier = Modifier.padding(horizontal = 4.dp),
                     )
@@ -235,7 +243,7 @@ private fun Sheet(
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     Text(
-                        "Next time in ${intercept.appLabel}, remove ${offers.joinToString(" and ") { it.label.lowercase() }} without asking",
+                        stringResource(R.string.sheet_learn, intercept.appLabel, offers.joinToString(stringResource(R.string.and_)) { it.title.lowercase() }),
                         style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f),
                     )
                     Checkbox(checked = learn, onCheckedChange = null, colors = CheckboxDefaults.colors(checkedColor = Frost.Night))
@@ -245,10 +253,10 @@ private fun Sheet(
 
             val approved = findings.filter { it.fixable && remove[it.key] == true }
             PrimaryButton(
-                if (approved.isEmpty()) "Continue" else "Remove add-ons & continue",
+                if (approved.isEmpty()) stringResource(R.string.continue_) else stringResource(R.string.sheet_remove),
                 onClick = { onRemove(approved, if (learn) offers.toSet() else emptySet()) },
             )
-            QuietButton("Keep everything", onClick = onKeep)
+            QuietButton(stringResource(R.string.sheet_keep), onClick = onKeep)
         }
     }
 }
@@ -265,8 +273,8 @@ private fun FindingRow(f: Finding, checked: Boolean, onChecked: (Boolean) -> Uni
         Column(Modifier.weight(1f)) {
             Text(f.evidence, style = MaterialTheme.typography.titleMedium, maxLines = 2)
             Text(
-                "${f.kind.label} · ${f.kind.code}" +
-                    if (f.recurring > 0) " · then ${Money.format(f.recurring)}/mo, ${Money.format(f.recurring * 12)}/yr" else "",
+                "${f.kind.title} · ${f.kind.code}" +
+                    if (f.recurring > 0) stringResource(R.string.sheet_then, Money.format(f.recurring), Money.format(f.recurring * 12)) else "",
                 style = MaterialTheme.typography.bodyMedium, color = Frost.Ink2,
             )
         }
@@ -277,7 +285,7 @@ private fun FindingRow(f: Finding, checked: Boolean, onChecked: (Boolean) -> Uni
                 colors = CheckboxDefaults.colors(checkedColor = Frost.Night),
             )
         } else {
-            Pill(if (f.cost > 0) "Can't remove" else "Ignore it", bg = Frost.WarnBg, fg = Frost.WarnInk)
+            Pill(if (f.cost > 0) stringResource(R.string.sheet_cant_remove) else stringResource(R.string.sheet_ignore), bg = Frost.WarnBg, fg = Frost.WarnInk)
         }
     }
 }

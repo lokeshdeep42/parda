@@ -1,5 +1,8 @@
 package app.parda.ui.components
 
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -132,12 +135,20 @@ fun Dot(color: Color, size: Dp = 10.dp) {
 
 @Composable
 fun SectionLabel(text: String, color: Color = Frost.Ink2) {
-    Text(text.uppercase(), style = MaterialTheme.typography.labelSmall, color = color)
+    // Shown in capitals, read as written: screen readers spell out some all-caps words.
+    Text(
+        text.uppercase(), style = MaterialTheme.typography.labelSmall, color = color,
+        modifier = Modifier.semantics { heading(); contentDescription = text },
+    )
 }
+
+/** Marks a screen's title as a heading, so screen readers can jump between sections. */
+fun Modifier.asHeading(): Modifier = semantics { heading() }
 
 @Composable
 fun Stat(value: String, label: String, modifier: Modifier = Modifier) {
-    Column(modifier) {
+    // Read as one item ("₹0, Saved"), not as a number and a caption far apart.
+    Column(modifier.semantics(mergeDescendants = true) {}) {
         Text(value, style = MaterialTheme.typography.headlineMedium)
         Text(label, style = MaterialTheme.typography.bodyMedium, color = Frost.Ink2)
     }
