@@ -12,6 +12,7 @@ class PardaApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        instance = this
         store = PardaStore(this)
         app.parda.data.BuildConfigCompat.debuggable = applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0
         thread(name = "parda-model") { store.loadModel() }
@@ -31,6 +32,10 @@ class PardaApp : Application() {
 
     companion object {
         const val CHANNEL_INTERCEPTS = "intercepts"
+
+        /** For strings in the app's language where no screen is at hand; see [app.parda.ui.str]. */
+        lateinit var instance: PardaApp
+            private set
     }
 }
 

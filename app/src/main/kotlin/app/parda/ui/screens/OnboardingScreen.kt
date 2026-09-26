@@ -1,5 +1,8 @@
 package app.parda.ui.screens
 
+import app.parda.ui.components.asHeading
+import app.parda.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -54,30 +57,30 @@ fun OnboardingScreen(
                 contentAlignment = Alignment.Center,
             ) { StrokeIcon(Icons.Shield, size = 40.dp) }
             Text(
-                "Parda watches the screen,\nnot you.",
-                style = MaterialTheme.typography.headlineMedium, textAlign = TextAlign.Center,
+                stringResource(R.string.onb_title),
+                style = MaterialTheme.typography.headlineMedium, textAlign = TextAlign.Center, modifier = Modifier.asHeading(),
             )
             Text(
-                "Two permissions let it catch tricks at checkout and tell you when it paused one.",
+                stringResource(R.string.onb_sub),
                 style = MaterialTheme.typography.bodyLarge, color = Frost.Ink2, textAlign = TextAlign.Center,
             )
             PermissionRow(
-                Icons.Shield, "Accessibility",
-                "Reads checkout screens to spot pre-ticked boxes and fake timers",
+                Icons.Shield, stringResource(R.string.perm_a11y),
+                stringResource(R.string.perm_a11y_desc),
                 accessibilityOn, onAccessibility,
             )
             PermissionRow(
-                Icons.Ledger, "Notifications", "Tells you when a checkout is flagged",
+                Icons.Ledger, stringResource(R.string.perm_notif), stringResource(R.string.perm_notif_desc),
                 notificationsOn, onNotifications,
             )
             NightCard {
                 Text(
-                    "The model runs on this phone. No account, no cloud, no analytics — Parda does not declare the internet permission at all. Works in flight mode.",
+                    stringResource(R.string.onb_model),
                     style = MaterialTheme.typography.bodyMedium, color = Color(0xFFD5D8DE),
                 )
             }
         }
-        PrimaryButton("Continue", onClick = onContinue)
+        PrimaryButton(stringResource(R.string.continue_), onClick = onContinue)
     }
 }
 
@@ -95,10 +98,10 @@ private fun PermissionRow(icon: ImageVector, title: String, body: String, grante
             if (granted) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     StrokeIcon(Icons.Check, tint = Frost.Ok, size = 16.dp)
-                    Text("On", style = MaterialTheme.typography.labelMedium, color = Frost.Ok)
+                    Text(stringResource(R.string.perm_on), style = MaterialTheme.typography.labelMedium, color = Frost.Ok)
                 }
             } else {
-                Pill("Allow", strong = true, onClick = onGrant)
+                Pill(stringResource(R.string.allow), strong = true, onClick = onGrant)
             }
         }
     }

@@ -1,5 +1,9 @@
 package app.parda
 
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.res.stringResource
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -176,7 +180,8 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun FloatingNav(selected: Int, onSelect: (Int) -> Unit, modifier: Modifier = Modifier) {
     val items: List<Pair<ImageVector, String>> = listOf(
-        Icons.Home to "Home", Icons.Shield to "Firewall", Icons.Lock to "Airlock", Icons.Ledger to "Ledger",
+        Icons.Home to stringResource(R.string.nav_home), Icons.Shield to stringResource(R.string.nav_firewall),
+        Icons.Lock to stringResource(R.string.nav_airlock), Icons.Ledger to stringResource(R.string.nav_ledger),
     )
     Row(
         modifier
@@ -194,7 +199,7 @@ private fun FloatingNav(selected: Int, onSelect: (Int) -> Unit, modifier: Modifi
                 Modifier.size(52.dp).clip(CircleShape).background(if (on) Frost.Night else Color.Transparent),
                 contentAlignment = Alignment.Center,
             ) {
-                IconButton(onClick = { onSelect(i) }) {
+                IconButton(onClick = { onSelect(i) }, modifier = Modifier.semantics { this.selected = on }) {
                     StrokeIcon(icon, tint = if (on) Color.White else Frost.Ink, contentDescription = label)
                 }
             }

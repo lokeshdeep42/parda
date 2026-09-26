@@ -1,5 +1,11 @@
 package app.parda.ui.screens
 
+import app.parda.ui.components.asHeading
+import app.parda.ui.title
+import app.parda.ui.plural
+import app.parda.ui.str
+import app.parda.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -42,17 +48,17 @@ import java.util.Date
 fun LedgerScreen(entries: List<LedgerEntry>, chainIntact: Boolean, internetDeclared: Boolean, egressBytes: Long) {
     ScreenColumn {
         Column {
-            Text("Ledger", style = MaterialTheme.typography.headlineLarge)
-            Text("Every decision at either boundary. Append-only.", style = MaterialTheme.typography.bodyLarge, color = Frost.Ink2)
+            Text(stringResource(R.string.nav_ledger), style = MaterialTheme.typography.headlineLarge, modifier = Modifier.asHeading())
+            Text(stringResource(R.string.ledger_sub), style = MaterialTheme.typography.bodyLarge, color = Frost.Ink2)
         }
 
         NightCard {
-            SectionLabel("Egress receipt", Frost.NightInk2)
-            ReceiptRow("Network permission", if (internetDeclared) "declared" else "not declared", !internetDeclared)
-            ReceiptRow("Bytes this app has sent", formatBytes(egressBytes), egressBytes == 0L)
-            ReceiptRow("Ledger chain", if (chainIntact) "intact" else "broken", chainIntact)
+            SectionLabel(stringResource(R.string.ledger_receipt), Frost.NightInk2)
+            ReceiptRow(stringResource(R.string.ledger_net), if (internetDeclared) stringResource(R.string.ledger_declared) else stringResource(R.string.ledger_not_declared), !internetDeclared)
+            ReceiptRow(stringResource(R.string.ledger_bytes), formatBytes(egressBytes), egressBytes == 0L)
+            ReceiptRow(stringResource(R.string.ledger_chain), if (chainIntact) stringResource(R.string.ledger_intact) else stringResource(R.string.ledger_broken), chainIntact)
             Text(
-                "Parda cannot open a socket. Anything that leaves does so through your share sheet, by your own hand.",
+                stringResource(R.string.ledger_no_socket),
                 style = MaterialTheme.typography.bodyMedium, color = Frost.NightInk2,
             )
         }
@@ -66,14 +72,14 @@ fun LedgerScreen(entries: List<LedgerEntry>, chainIntact: Boolean, internetDecla
         val shown = inChannel.filter { verdict == null || it.verdict == verdict }
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            listOf(null to "All", Channel.A to "Checkout", Channel.B to "Airlock").forEach { (c, name) ->
+            listOf(null to stringResource(R.string.ledger_all), Channel.A to stringResource(R.string.tab_checkout), Channel.B to stringResource(R.string.nav_airlock)).forEach { (c, name) ->
                 Pill(name, strong = channel == c, onClick = { channel = c })
             }
         }
         if (verdicts.size > 1) {
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Pill("Any outcome", strong = verdict == null, onClick = { verdict = null })
-                verdicts.forEach { v -> Pill(v.label, strong = verdict == v, onClick = { verdict = v }) }
+                Pill(stringResource(R.string.ledger_any_outcome), strong = verdict == null, onClick = { verdict = null })
+                verdicts.forEach { v -> Pill(v.title, strong = verdict == v, onClick = { verdict = v }) }
             }
         }
         Text(summary(shown), style = MaterialTheme.typography.bodyMedium, color = Frost.Ink2)
@@ -81,7 +87,7 @@ fun LedgerScreen(entries: List<LedgerEntry>, chainIntact: Boolean, internetDecla
         GlassCard(radius = 26.dp, padding = 0.dp, spacing = 0.dp) {
             if (shown.isEmpty()) {
                 Text(
-                    if (entries.isEmpty()) "No decisions recorded yet." else "Nothing matches this filter.",
+                    if (entries.isEmpty()) stringResource(R.string.ledger_empty) else stringResource(R.string.ledger_no_match),
                     Modifier.padding(16.dp), color = Frost.Ink2,
                 )
             }
@@ -99,17 +105,17 @@ fun LedgerScreen(entries: List<LedgerEntry>, chainIntact: Boolean, internetDecla
                         Text(e.detail, style = MaterialTheme.typography.bodyLarge)
                         Text(
                             channelName(e.channel) + " · " + DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(e.timeMillis)) +
-                                (if (e.savedPaise > 0) " · saved ${Money.format(e.savedPaise)}" else ""),
+                                (if (e.savedPaise > 0) stringResource(R.string.ledger_row_saved, Money.format(e.savedPaise)) else ""),
                             style = MaterialTheme.typography.bodyMedium, color = Frost.Ink2,
                         )
                     }
                     val (bg, fg) = verdictColors(e.verdict)
-                    Pill(e.verdict.label, bg = bg, fg = fg)
+                    Pill(e.verdict.title, bg = bg, fg = fg)
                 }
                 if (i != latest.lastIndex) HorizontalDivider(color = Frost.Ink.copy(alpha = 0.06f))
             }
             if (shown.size > MAX_ROWS) {
-                Text("Showing the latest $MAX_ROWS of ${shown.size}.", Modifier.padding(16.dp), color = Frost.Ink2)
+                Text(stringResource(R.string.ledger_latest, MAX_ROWS, shown.size), Modifier.padding(16.dp), color = Frost.Ink2)
             }
         }
     }
@@ -117,16 +123,16 @@ fun LedgerScreen(entries: List<LedgerEntry>, chainIntact: Boolean, internetDecla
 
 private const val MAX_ROWS = 200
 
-private fun channelName(c: Channel) = if (c == Channel.A) "Checkout" else "Airlock"
+private fun channelName(c: Channel) = str(if (c == Channel.A) R.string.tab_checkout else R.string.nav_airlock)
 
 private fun summary(shown: List<LedgerEntry>): String {
-    val parts = mutableListOf("${shown.size} decision" + if (shown.size == 1) "" else "s")
+    val parts = mutableListOf(plural(R.plurals.pl_decisions, shown.size))
     val saved = shown.sumOf { it.savedPaise }
     val masked = shown.sumOf { it.masked }
     val patterns = shown.sumOf { it.patterns }
-    if (saved > 0) parts += "${Money.format(saved)} saved"
-    if (patterns > 0) parts += "$patterns pattern" + if (patterns == 1) "" else "s"
-    if (masked > 0) parts += "$masked field" + (if (masked == 1) "" else "s") + " masked"
+    if (saved > 0) parts += str(R.string.ledger_saved_sum, Money.format(saved))
+    if (patterns > 0) parts += plural(R.plurals.pl_patterns, patterns)
+    if (masked > 0) parts += plural(R.plurals.pl_fields_masked, masked)
     return parts.joinToString(" · ")
 }
 
