@@ -9,6 +9,10 @@
             android:exported="true"
             tools:replace="android:exported" />
         <activity
+            android:name="app.parda.bench.ModelWakeCheckActivity"
+            android:exported="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+        <activity
             android:name="app.parda.bench.OcrCheckActivity"
             android:exported="true" />
         <activity

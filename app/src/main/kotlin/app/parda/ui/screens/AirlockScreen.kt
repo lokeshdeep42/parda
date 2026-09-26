@@ -230,7 +230,7 @@ fun AirlockScreen(initialText: String?, initialImage: Uri? = null) {
                             ) { piece -> scope.launch(Dispatchers.Main) { streamed += piece } }
                         }
                         val planner = d.plannedBy.label +
-                            if (d.plannedBy == Planner.MODEL) " (${(model as? ModelStatus.Ready)?.name ?: "model"})" else ""
+                            if (d.plannedBy == Planner.MODEL) " (${modelName(model) ?: "model"})" else ""
                         decision = d
                         thinking = false
                         when (d) {
@@ -449,6 +449,8 @@ private fun ModelCard(model: ModelStatus, installed: List<Pair<String, Long>>, o
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 val (title, detail) = when (model) {
+                    is ModelStatus.Resting -> model.name to "Resting to free memory · wakes in about a second when you ask" +
+                        if (installed.size > 1) " · ${installed.size} models installed" else ""
                     is ModelStatus.Ready -> model.name to "Running on this phone's CPU · loaded in ${model.loadMillis} ms" +
                         if (installed.size > 1) " · ${installed.size} models installed" else ""
                     is ModelStatus.Loading -> model.name to "Loading…"
@@ -460,15 +462,15 @@ private fun ModelCard(model: ModelStatus, installed: List<Pair<String, Long>>, o
             }
             if (model is ModelStatus.Missing || model is ModelStatus.Failed) {
                 Pill("Import", strong = true, onClick = onImport)
-            } else if (model is ModelStatus.Ready && installed.size > 1) {
+            } else if ((model is ModelStatus.Ready || model is ModelStatus.Resting) && installed.size > 1) {
                 Box {
                     Pill("Switch", onClick = { menu = true })
                     // Every installed model, in the benchmark's order; the one running is ticked.
                     DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                         installed.forEach { (name, bytes) ->
                             DropdownMenuItem(
-                                text = { Text((if (name == model.name) "✓ " else "") + name + " · " + "%.1f GB".format(bytes / 1e9)) },
-                                onClick = { menu = false; if (name != model.name) onPick(name) },
+                                text = { Text((if (name == modelName(model)) "✓ " else "") + name + " · " + "%.1f GB".format(bytes / 1e9)) },
+                                onClick = { menu = false; if (name != modelName(model)) onPick(name) },
                             )
                         }
                         DropdownMenuItem(text = { Text("Import another .gguf") }, onClick = { menu = false; onImport() })
@@ -531,3 +533,10 @@ Registered address: 12-4-89, Kondapur Main Road, Hyderabad 500084
 Contact: rajesh.kumar@example.com / +91 98490 12345
 
 Please confirm receipt within seven working days."""
+
+/** The model the agent will use, whether it is loaded right now or resting. */
+private fun modelName(model: ModelStatus): String? = when (model) {
+    is ModelStatus.Ready -> model.name
+    is ModelStatus.Resting -> model.name
+    else -> null
+}

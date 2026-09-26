@@ -20,6 +20,15 @@ class PardaApp : Application() {
         )
     }
 
+    /** When Android runs short of memory, the resting model is the first thing Parda gives back. */
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        @Suppress("DEPRECATION")
+        if (level >= TRIM_MEMORY_BACKGROUND || level == TRIM_MEMORY_RUNNING_LOW || level == TRIM_MEMORY_RUNNING_CRITICAL) {
+            thread(name = "parda-model-rest") { store.restModel() }
+        }
+    }
+
     companion object {
         const val CHANNEL_INTERCEPTS = "intercepts"
     }
