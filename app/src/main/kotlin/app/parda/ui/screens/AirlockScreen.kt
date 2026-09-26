@@ -1,5 +1,9 @@
 package app.parda.ui.screens
 
+import androidx.compose.foundation.horizontalScroll
+import app.parda.core.document.SuggestedQuestions
+import app.parda.core.agent.Planner
+import kotlinx.coroutines.Job
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.selection.toggleable
@@ -91,6 +95,12 @@ fun AirlockScreen(initialText: String?, initialImage: Uri? = null) {
     }
 
     var fileNote by remember { mutableStateOf<String?>(null) }
+    // The file behind the text box: summaries use all of it, the box shows the first 20,000 characters.
+    var preview by remember { mutableStateOf<String?>(null) }
+    var fullText by remember { mutableStateOf<String?>(null) }
+    var pages by remember { mutableStateOf<Int?>(null) }
+    var fullRead by remember { mutableStateOf<Job?>(null) }
+    var streamed by remember { mutableStateOf("") }
     var image by remember { mutableStateOf<ImageAirlock.Result?>(null) }
     var imageName by remember { mutableStateOf("") }
     fun openImage(uri: Uri, scannedPdf: Boolean = false) {
@@ -122,10 +132,23 @@ fun AirlockScreen(initialText: String?, initialImage: Uri? = null) {
             fileNote = "Reading…"
             scope.launch {
                 val read = withContext(Dispatchers.IO) { runCatching { DocumentReader.read(context, uri) } }
-                read.onSuccess {
-                    document = it.text
+                read.onSuccess { r ->
+                    document = r.text
+                    preview = r.text
+                    fullText = r.full
+                    pages = r.pages
                     decision = null
-                    fileNote = "${it.name} · read on this phone" + if (it.truncated) " · first 20,000 characters" else ""
+                    fileNote = fileNote(r)
+                    if (!r.complete) {
+                        // A long PDF: show the preview now, read the rest for the summary meanwhile.
+                        fullRead = scope.launch {
+                            val whole = withContext(Dispatchers.IO) { runCatching { DocumentReader.read(context, uri, whole = true) }.getOrNull() }
+                            if (whole != null) {
+                                fullText = whole.full
+                                fileNote = fileNote(whole)
+                            }
+                        }
+                    }
                 }.onFailure {
                     // No text layer: a scanned PDF. Read it with OCR like a photo instead.
                     if (it is DocumentReader.NoText && it.pdf) openImage(uri, scannedPdf = true)
@@ -169,23 +192,33 @@ fun AirlockScreen(initialText: String?, initialImage: Uri? = null) {
                 onValueChange = { request = it; decision = null },
                 modifier = Modifier.fillMaxWidth(),
                 label = { Text("What do you want to know?") },
-                placeholder = { Text("Summarise the key terms") },
+                placeholder = { Text("Ask about this document, or tap a suggestion") },
                 colors = fieldColors(),
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Pill("Summarise", onClick = { request = EASY; decision = null })
-                Pill("Am I underpaid?", onClick = { request = HARD; decision = null })
+            // Questions that fit whatever is loaded: a statement, a lease, a payroll export, an ID.
+            val suggestions = remember(document) { SuggestedQuestions.of(document) }
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                suggestions.forEach { q -> Pill(q.label, strong = request == q.request, onClick = { request = q.request; decision = null }) }
             }
             PrimaryButton(
                 if (thinking) "Thinking on this phone…" else "Ask the agent",
                 enabled = document.isNotBlank() && !thinking,
                 onClick = {
                     thinking = true
+                    streamed = ""
                     scope.launch {
-                        val planner = (model as? ModelStatus.Ready)?.name ?: "rule-based agent"
+                        fullRead?.join()
+                        // If the text box was edited, it is the document; otherwise the whole file is.
+                        val fromFile = preview != null && document == preview
+                        val whole = if (fromFile) fullText ?: document else document
                         val d = withContext(Dispatchers.Default) {
-                            store.gate.handle(document, request.ifBlank { EASY }, store.policy.value)
+                            store.gate.handle(
+                                document, request.ifBlank { SuggestedQuestions.of(document).firstOrNull()?.request ?: EASY }, store.policy.value,
+                                full = whole, pages = if (fromFile) pages else null,
+                            ) { piece -> scope.launch(Dispatchers.Main) { streamed += piece } }
                         }
+                        val planner = d.plannedBy.label +
+                            if (d.plannedBy == Planner.MODEL) " (${(model as? ModelStatus.Ready)?.name ?: "model"})" else ""
                         decision = d
                         thinking = false
                         when (d) {
@@ -205,11 +238,17 @@ fun AirlockScreen(initialText: String?, initialImage: Uri? = null) {
         }
 
         when (val d = decision) {
-            null -> Unit
+            null -> if (thinking && streamed.isNotBlank()) {
+                GlassCard(padding = 16.dp) {
+                    SectionLabel("Writing on this phone…")
+                    Text(streamed, style = MaterialTheme.typography.bodyLarge)
+                }
+            }
             is GateDecision.HeldLocally -> {
                 NightCard {
                     SectionLabel("Answered on this phone", Frost.NightInk2)
                     Text("Nothing needed to leave — not even a surrogate.", color = Color.White, style = MaterialTheme.typography.bodyLarge)
+                    Text("Planned by ${d.plannedBy.label}", color = Frost.NightInk2, style = MaterialTheme.typography.bodyMedium)
                 }
                 GlassCard(padding = 16.dp) {
                     SectionLabel("Answer")
@@ -226,6 +265,9 @@ fun AirlockScreen(initialText: String?, initialImage: Uri? = null) {
                 }
                 GlassCard(padding = 16.dp) {
                     SectionLabel("What you can take outside · ${d.result.vault.withheld} withheld")
+                    if (preview != null && document == preview && (fullText?.length ?: 0) > document.length) {
+                        Text("This copy is the text box: the first 20,000 characters of the file.", style = MaterialTheme.typography.bodyMedium, color = Frost.Ink2)
+                    }
                     Mono(d.outbound)
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
                         Pill("Copy", strong = true, onClick = { clipboard.setText(AnnotatedString(d.outbound)) })
@@ -351,6 +393,18 @@ private fun ModelCard(model: ModelStatus, onImport: () -> Unit) {
     }
 }
 
+/** Says plainly how much of the file was read and what each part of the screen covers. */
+private fun fileNote(r: DocumentReader.Result): String {
+    val parts = mutableListOf(r.name)
+    r.pages?.let { parts += "$it page" + if (it == 1) "" else "s" }
+    parts += "read on this phone"
+    if (r.truncated) {
+        parts += if (r.complete) "summaries cover the whole file; the box shows the first 20,000 characters"
+        else "reading the rest for the summary…"
+    }
+    return parts.joinToString(" · ")
+}
+
 private fun displayName(context: Context, uri: Uri): String? =
     context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
         if (c.moveToFirst()) c.getString(0) else null
@@ -379,7 +433,6 @@ private fun fieldColors() = OutlinedTextFieldDefaults.colors(
 
 private const val VAULT_ROWS = 40
 private const val EASY = "Summarise the key terms of this letter in three lines."
-private const val HARD = "Compare this against typical FY26 compensation bands for my role and tell me if I am underpaid."
 
 private const val SAMPLE = """Subject: Salary revision — FY 2026-27
 

@@ -18,7 +18,7 @@ class RuleBasedAgent(private val classifier: Classifier = Classifier()) : LocalA
         }
     }
 
-    override fun answer(task: LocalTask, request: String, document: String): String? = when (task) {
+    override fun answer(task: LocalTask, request: String, document: String, onToken: (String) -> Unit): String? = when (task) {
         LocalTask.SUMMARISE -> summarise(document)
         LocalTask.EXTRACT -> extract(document)
         LocalTask.REWRITE -> null
@@ -38,10 +38,15 @@ class RuleBasedAgent(private val classifier: Classifier = Classifier()) : LocalA
     private fun extract(document: String): String {
         val found = classifier.classify(document)
         if (found.isEmpty()) return "No names, numbers or amounts found."
-        return found.joinToString("\n") { "${it.detector}: ${it.value}" }
+        val counts = found.groupingBy { it.category.label }.eachCount().entries.sortedByDescending { it.value }
+        val head = "${found.size} item(s): " + counts.joinToString(" · ") { (k, n) -> "$n ${k.lowercase()}" }
+        val shown = found.take(MAX_LISTED).joinToString("\n") { "${it.detector}: ${it.value}" }
+        val more = if (found.size > MAX_LISTED) "\n…and ${found.size - MAX_LISTED} more, all found on this phone." else ""
+        return "$head\n\n$shown$more"
     }
 
     private companion object {
+        const val MAX_LISTED = 40
         val OUTSIDE = listOf(
             "compare", "typical", "market", "benchmark", "average", "industry", "latest", "current rate",
             "news", "underpaid", "overpaid", "is this fair", "should i", "research", "search", "look up",

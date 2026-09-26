@@ -176,13 +176,42 @@ object Detectors {
 
 /** Runs every detector and resolves overlaps into a clean, ordered list of spans. */
 class Classifier(private val detectors: List<Detector> = Detectors.DEFAULT) {
+    /**
+     * A whole 600-page file is split at line breaks and classified on every core. No detector
+     * matches across a line break, so splitting there changes nothing but the time taken.
+     */
     fun classify(text: String): List<Detection> {
+        if (text.length < PARALLEL_FROM) return classifyPart(text)
+        val parts = mutableListOf<IntRange>()
+        var start = 0
+        while (start < text.length) {
+            val cut = text.indexOf('\n', minOf(start + PART, text.length)).let { if (it < 0) text.length else it + 1 }
+            parts += start until cut
+            start = cut
+        }
+        return parts.parallelStream()
+            .map { r -> classifyPart(text.substring(r.first, r.last + 1)).map { it.copy(start = it.start + r.first, end = it.end + r.first) } }
+            .collect(java.util.stream.Collectors.toList())
+            .flatten()
+    }
+
+    private fun classifyPart(text: String): List<Detection> {
         val candidates = detectors.flatMapIndexed { rank, d -> d.find(text).map { rank to it } }
             .sortedWith(compareBy<Pair<Int, Detection>> { it.first }.thenByDescending { it.second.end - it.second.start })
-        val taken = mutableListOf<Detection>()
+        // Taken spans never overlap, so a candidate can only collide with its nearest neighbour
+        // on either side: a sorted map keeps this O(n log n) for a whole 600-page file.
+        val taken = java.util.TreeMap<Int, Detection>()
         for ((_, c) in candidates) {
-            if (taken.none { c.start < it.end && c.end > it.start }) taken += c
+            val before = taken.floorEntry(c.start)?.value
+            val after = taken.ceilingEntry(c.start)?.value
+            if ((before == null || before.end <= c.start) && (after == null || after.start >= c.end)) taken[c.start] = c
         }
-        return taken.sortedBy { it.start }
+        return taken.values.toList()
+    }
+
+    private companion object {
+        /** Below this, one core is quicker than splitting. */
+        const val PARALLEL_FROM = 100_000
+        const val PART = 50_000
     }
 }

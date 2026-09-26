@@ -8,9 +8,11 @@ import java.io.File
 class LlamaEngine private constructor(private var handle: Long, val modelName: String) : TextEngine, Closeable {
 
     @Synchronized
-    override fun complete(prompt: String, grammar: String?, maxTokens: Int): String {
+    override fun complete(prompt: String, grammar: String?, maxTokens: Int, onToken: (String) -> Unit): String {
         check(handle != 0L) { "engine closed" }
-        return LlamaNative.complete(handle, prompt, grammar, maxTokens).toString(Charsets.UTF_8)
+        // Grammar-constrained output is a plan, not text for the user: nothing to stream.
+        val sink = if (grammar == null) TokenSink { onToken(it.toString(Charsets.UTF_8)) } else null
+        return LlamaNative.complete(handle, prompt, grammar, maxTokens, sink).toString(Charsets.UTF_8)
     }
 
     @Synchronized
@@ -32,6 +34,11 @@ class LlamaEngine private constructor(private var handle: Long, val modelName: S
     }
 }
 
+/** Called from native code with each complete UTF-8 piece of the answer. */
+fun interface TokenSink {
+    fun onToken(utf8: ByteArray)
+}
+
 internal object LlamaNative {
     private var initialised = false
 
@@ -45,6 +52,6 @@ internal object LlamaNative {
 
     @JvmStatic external fun init(nativeLibDir: String)
     @JvmStatic external fun load(path: String, nCtx: Int): Long
-    @JvmStatic external fun complete(handle: Long, prompt: String, grammar: String?, maxTokens: Int): ByteArray
+    @JvmStatic external fun complete(handle: Long, prompt: String, grammar: String?, maxTokens: Int, sink: TokenSink?): ByteArray
     @JvmStatic external fun free(handle: Long)
 }

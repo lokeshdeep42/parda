@@ -47,6 +47,16 @@ jbyteArray to_bytes(JNIEnv * env, const std::string & s) {
     return arr;
 }
 
+/** True when [s] ends on a complete UTF-8 character, so it can be handed to Java as is. */
+bool complete_utf8(const std::string & s) {
+    int i = (int) s.size() - 1, back = 0;
+    while (i >= 0 && back < 4 && (static_cast<unsigned char>(s[i]) & 0xC0) == 0x80) { i--; back++; }
+    if (i < 0) return back == 0;
+    const unsigned char lead = s[i];
+    const int need = lead < 0x80 ? 0 : (lead >> 5) == 0x6 ? 1 : (lead >> 4) == 0xE ? 2 : (lead >> 3) == 0x1E ? 3 : 0;
+    return back == need;
+}
+
 int thread_count() {
     const long cores = sysconf(_SC_NPROCESSORS_ONLN);
     return (int) std::clamp(cores - 2, 2L, 6L);
@@ -89,7 +99,10 @@ Java_app_parda_llm_LlamaNative_load(JNIEnv * env, jobject, jstring jpath, jint n
 /** Returns UTF-8 bytes (not a jstring: NewStringUTF chokes on 4-byte characters). */
 extern "C" JNIEXPORT jbyteArray JNICALL
 Java_app_parda_llm_LlamaNative_complete(JNIEnv * env, jobject, jlong handle, jstring jprompt,
-                                        jstring jgrammar, jint max_tokens) {
+                                        jstring jgrammar, jint max_tokens, jobject sink) {
+    // [sink] (may be null) receives the answer piece by piece, so the screen can show it as it is written.
+    jmethodID on_token = sink ? env->GetMethodID(env->GetObjectClass(sink), "onToken", "([B)V") : nullptr;
+    std::string pending;
     auto * s = reinterpret_cast<Session *>(handle);
     const llama_vocab * vocab = llama_model_get_vocab(s->model);
     const std::string prompt = to_string(env, jprompt);
@@ -140,7 +153,16 @@ Java_app_parda_llm_LlamaNative_complete(JNIEnv * env, jobject, jlong handle, jst
         llama_token tok = llama_sampler_sample(smpl, s->ctx, -1);
         if (llama_vocab_is_eog(vocab, tok)) break;
         const int n = llama_token_to_piece(vocab, tok, buf, sizeof(buf), 0, false);
-        if (n > 0) out.append(buf, n);
+        if (n > 0) {
+            out.append(buf, n);
+            pending.append(buf, n);
+            if (on_token && complete_utf8(pending)) {
+                jbyteArray piece = to_bytes(env, pending);
+                env->CallVoidMethod(sink, on_token, piece);
+                env->DeleteLocalRef(piece);
+                pending.clear();
+            }
+        }
         if (llama_decode(s->ctx, llama_batch_get_one(&tok, 1)) != 0) {
             LOGE("decode failed during generation");
             break;

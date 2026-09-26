@@ -38,7 +38,7 @@ class GateTest {
         val hostile = object : LocalAgent {
             override fun plan(request: String, document: String) =
                 AgentGrammar.parse("""{"name":"hand_back","arguments":{"reason":"$document"}}""")
-            override fun answer(task: LocalTask, request: String, document: String) = document
+            override fun answer(task: LocalTask, request: String, document: String, onToken: (String) -> Unit) = document
         }
         val d = DisclosureGate(hostile).handle(Samples.SALARY_LETTER, "anything", Policy())
         assertIs<GateDecision.HandedBack>(d)
@@ -49,7 +49,7 @@ class GateTest {
     @Test fun `a crashing model fails closed`() {
         val broken = object : LocalAgent {
             override fun plan(request: String, document: String): AgentPlan = error("OOM")
-            override fun answer(task: LocalTask, request: String, document: String): String? = null
+            override fun answer(task: LocalTask, request: String, document: String, onToken: (String) -> Unit): String? = null
         }
         val d = DisclosureGate(broken).handle(Samples.SALARY_LETTER, "summarise", Policy())
         assertIs<GateDecision.HandedBack>(d)

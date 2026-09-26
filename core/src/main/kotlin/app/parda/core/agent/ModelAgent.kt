@@ -4,9 +4,9 @@ package app.parda.core.agent
 fun interface TextEngine {
     /**
      * Completes [prompt]. When [grammar] is set, sampling is constrained to it, so the output
-     * can only be a string the grammar accepts.
+     * can only be a string the grammar accepts. [onToken] receives the text as it is generated.
      */
-    fun complete(prompt: String, grammar: String?, maxTokens: Int): String
+    fun complete(prompt: String, grammar: String?, maxTokens: Int, onToken: (String) -> Unit): String
 }
 
 /**
@@ -14,23 +14,27 @@ fun interface TextEngine {
  * Planning is grammar-constrained, so the model can only pick one of the enumerated calls.
  * Local answers are free text, but they are only ever shown on this screen, never handed back.
  *
- * A small model can misroute a question that plainly needs outside facts ("is this legal?") to a
- * local task. [guard] is a deterministic veto for those: when it says the request needs outside
- * knowledge, that wins. Handing back is the conservative path, since only the sanitized copy goes.
+ * [guard] answers first. When its keywords settle the plan ("summarise", "extract", or a question
+ * that plainly needs outside facts, which a small model can misroute), the model is not asked:
+ * that saves several seconds and the outcome is deterministic. The model plans only the requests
+ * the rules cannot place.
  */
 class ModelAgent(
     private val engine: TextEngine,
     private val guard: LocalAgent = RuleBasedAgent(),
 ) : LocalAgent {
 
-    override fun plan(request: String, document: String): AgentPlan {
-        val veto = guard.plan(request, document)
-        if (veto == AgentPlan.HandBack(HandBackReason.NEEDS_OUTSIDE_KNOWLEDGE)) return veto
-        return AgentGrammar.parse(engine.complete(HammerPrompt.plan(request, document), AgentGrammar.GBNF, PLAN_TOKENS))
+    override fun plan(request: String, document: String): AgentPlan = planned(request, document).plan
+
+    override fun planned(request: String, document: String): Planned {
+        val ruled = guard.plan(request, document)
+        if (ruled != AgentPlan.HandBack(HandBackReason.TOO_COMPLEX)) return Planned(ruled, Planner.RULES)
+        val output = engine.complete(HammerPrompt.plan(request, document), AgentGrammar.GBNF, PLAN_TOKENS) {}
+        return Planned(AgentGrammar.parse(output), Planner.MODEL)
     }
 
-    override fun answer(task: LocalTask, request: String, document: String): String? =
-        engine.complete(HammerPrompt.answer(task, request, document), null, ANSWER_TOKENS)
+    override fun answer(task: LocalTask, request: String, document: String, onToken: (String) -> Unit): String? =
+        engine.complete(HammerPrompt.answer(task, request, document), null, ANSWER_TOKENS, onToken)
             .trim()
             .takeIf { it.isNotEmpty() }
 

@@ -43,9 +43,23 @@ sealed interface AgentPlan {
 interface LocalAgent {
     fun plan(request: String, document: String): AgentPlan
 
-    /** Performs a local task. Returns null if this agent cannot do it. */
-    fun answer(task: LocalTask, request: String, document: String): String?
+    /** The plan, and what made it. Agents that can decide without a model say so. */
+    fun planned(request: String, document: String): Planned = Planned(plan(request, document), Planner.RULES)
+
+    /**
+     * Performs a local task. Returns null if this agent cannot do it. [onToken] receives the
+     * answer as it is written, for agents that generate it piece by piece.
+     */
+    fun answer(task: LocalTask, request: String, document: String, onToken: (String) -> Unit = {}): String?
 }
+
+/** Who decided a plan: shown to the user and written to the ledger. */
+enum class Planner(val label: String) {
+    RULES("keyword rules"),
+    MODEL("on-device model"),
+}
+
+data class Planned(val plan: AgentPlan, val by: Planner)
 
 /**
  * Grammar and parser for the model's function-call output. The grammar makes it impossible
