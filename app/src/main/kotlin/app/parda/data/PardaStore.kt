@@ -83,16 +83,36 @@ class PardaStore(context: Context) {
         _entries.value = ledger.all
     }
 
+    /** Every .gguf on the phone, best first: the user's pick, then the benchmark's ranking. */
+    fun installedModels(): List<File> {
+        val all = listOfNotNull(importDir, pushDir)
+            .flatMap { it.listFiles { f -> f.extension.equals("gguf", ignoreCase = true) }.orEmpty().toList() }
+            .distinctBy { it.name }
+        val chosen = prefs.getString(KEY_MODEL, null)
+        return all.sortedWith(
+            compareBy<File> { it.nameWithoutExtension != chosen }
+                .thenBy { f -> RANKED.indexOfFirst { it in f.name.lowercase() }.let { if (it < 0) RANKED.size else it } }
+                .thenByDescending { it.lastModified() },
+        )
+    }
+
+    /** Loads the next installed model and remembers it. Blocking: call off the main thread. */
+    fun switchModel() {
+        val models = installedModels()
+        if (models.size < 2) return
+        val current = (_model.value as? ModelStatus.Ready)?.name
+        val next = models[(models.indexOfFirst { it.nameWithoutExtension == current } + 1) % models.size]
+        prefs.edit().putString(KEY_MODEL, next.nameWithoutExtension).apply()
+        loadModel()
+    }
+
     /**
      * Finds a .gguf on the phone and loads it. Blocking and slow (seconds): call off the main
      * thread. Nothing is downloaded; the model gets here by `adb push` or [importModel].
      */
     @Synchronized
     fun loadModel() {
-        val file = listOfNotNull(importDir, pushDir)
-            .flatMap { it.listFiles { f -> f.extension.equals("gguf", ignoreCase = true) }.orEmpty().toList() }
-            .maxByOrNull { it.lastModified() }
-            ?: run { _model.value = ModelStatus.Missing; return }
+        val file = installedModels().firstOrNull() ?: run { _model.value = ModelStatus.Missing; return }
         if ((_model.value as? ModelStatus.Ready)?.name == file.nameWithoutExtension) return
 
         _model.value = ModelStatus.Loading(file.nameWithoutExtension)
@@ -134,6 +154,14 @@ class PardaStore(context: Context) {
     private companion object {
         const val KEY_POLICY = "policy"
         const val KEY_ONBOARDED = "onboarded"
+        const val KEY_MODEL = "model"
+
+        /**
+         * Measured on an iQOO (SM8850) with ModelBench: Hammer Q4_0 plans best for its speed
+         * (10/12, 4.3 s, 39 tok/s); Qwen2.5 3B plans perfectly but takes 12 s; Gemma 3 1B
+         * misroutes outside-knowledge questions and drops facts from answers.
+         */
+        val RANKED = listOf("hammer2.1-1.5b-q4_0", "hammer", "qwen2.5-3b", "qwen", "gemma")
     }
 }
 

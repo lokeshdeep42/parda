@@ -1,5 +1,6 @@
 package app.parda.core
 
+import app.parda.core.agent.ChatPrompt
 import app.parda.core.agent.DisclosureGate
 import app.parda.core.agent.GateDecision
 import app.parda.core.agent.HandBackReason
@@ -27,8 +28,8 @@ import kotlin.test.assertTrue
 class WholeFileTest {
     private class FakeEngine : TextEngine {
         var plans = 0
-        val answered = mutableListOf<String>()
-        override fun complete(prompt: String, grammar: String?, maxTokens: Int, onToken: (String) -> Unit): String {
+        val answered = mutableListOf<ChatPrompt>()
+        override fun complete(prompt: ChatPrompt, grammar: String?, maxTokens: Int, onToken: (String) -> Unit): String {
             if (grammar != null) { plans++; return """{"name":"hand_back","arguments":{"reason":"too_complex"}}""" }
             answered += prompt
             val gist = "The tenant pays a monthly rent and a refundable deposit."

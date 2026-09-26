@@ -80,6 +80,7 @@ dependencies {
     implementation(libs.pdfbox.android)
     // On-device OCR for the image Airlock. The bundled model ships in the APK: nothing is downloaded.
     implementation(libs.mlkit.text.recognition)
+    implementation(libs.mlkit.text.recognition.devanagari)
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)

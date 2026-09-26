@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Debug builds only: test hooks. Release builds never contain them. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <application>
+        <!-- Lets tests open a cart straight from adb, with the string extra "cart" (e.g. food). -->
+        <activity
+            android:name="app.parda.service.DemoCheckoutActivity"
+            android:exported="true"
+            tools:replace="android:exported" />
+        <activity
+            android:name="app.parda.bench.OcrCheckActivity"
+            android:exported="true" />
+        <activity
+            android:name="app.parda.bench.BenchActivity"
+            android:exported="true"
+            android:process=":bench"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode"
+            android:label="Parda model bench" />
+    </application>
+</manifest>

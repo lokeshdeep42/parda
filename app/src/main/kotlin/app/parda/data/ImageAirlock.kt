@@ -21,6 +21,7 @@ import app.parda.core.policy.Policy
 import com.google.android.gms.tasks.Tasks
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
+import com.google.mlkit.vision.text.devanagari.DevanagariTextRecognizerOptions
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import java.io.File
 
@@ -36,7 +37,8 @@ object ImageAirlock {
 
     class Result(val original: Bitmap, val plan: ImageMaskPlan)
 
-    private val recognizer by lazy { TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS) }
+    private val latin by lazy { TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS) }
+    private val devanagari by lazy { TextRecognition.getClient(DevanagariTextRecognizerOptions.Builder().build()) }
     private val masker = ImageMasker()
 
     /** Blocking: call off the main thread. */
@@ -62,7 +64,11 @@ object ImageAirlock {
     }
 
     private fun read(bitmap: Bitmap, policy: Policy): Result {
-        val text = Tasks.await(recognizer.process(InputImage.fromBitmap(bitmap, 0)))
+        // Both models ship inside the app. Devanagari also reads Latin; when it finds no Hindi,
+        // the Latin model, which is tuned for it, reads the image instead.
+        val image = InputImage.fromBitmap(bitmap, 0)
+        val text = Tasks.await(devanagari.process(image)).takeIf { t -> t.text.any { it in '\u0900'..'\u097F' } }
+            ?: Tasks.await(latin.process(image))
         val lines = text.textBlocks.flatMap { it.lines }.map { line ->
             OcrLine(
                 line.elements.mapNotNull { e ->

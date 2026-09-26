@@ -209,6 +209,12 @@ class CheckoutWatchService : AccessibilityService() {
         var instance: CheckoutWatchService? = null
             private set
 
+        /** Forgets what was handled in [pkg], so the next checkout there is reported afresh. */
+        fun forget(pkg: String) {
+            handled.remove(pkg)
+            lastCheckoutAt.remove(pkg)
+        }
+
         fun isEnabled(context: Context): Boolean {
             val enabled = android.provider.Settings.Secure.getString(
                 context.contentResolver, android.provider.Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES,

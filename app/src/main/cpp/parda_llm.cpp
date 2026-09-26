@@ -1,5 +1,6 @@
-// JNI bridge to llama.cpp. Deliberately small: load a GGUF, complete one prompt (optionally
-// under a GBNF grammar), free. Prompt formatting and parsing live in Kotlin, in :core.
+// JNI bridge to llama.cpp. Deliberately small: load a GGUF, complete one chat turn (optionally
+// under a GBNF grammar), free. Prompt wording and parsing live in Kotlin, in :core; the chat
+// template comes from the GGUF itself, so Hammer, Qwen and Gemma all get their own format.
 // Filter Logcat by the tag "PardaLLM" to see model load and timing logs.
 
 #include <android/log.h>
@@ -23,6 +24,8 @@ constexpr int BATCH = 512;
 struct Session {
     llama_model   * model;
     llama_context * ctx;
+    /** The previous prompt's tokens, whose keys and values are still in the context. */
+    std::vector<llama_token> cached;
 };
 
 void log_to_logcat(ggml_log_level level, const char * text, void *) {
@@ -55,6 +58,23 @@ bool complete_utf8(const std::string & s) {
     const unsigned char lead = s[i];
     const int need = lead < 0x80 ? 0 : (lead >> 5) == 0x6 ? 1 : (lead >> 4) == 0xE ? 2 : (lead >> 3) == 0x1E ? 3 : 0;
     return back == need;
+}
+
+/** Wraps one system + user turn in the model's own chat template (ChatML when it has none). */
+std::string format_chat(const llama_model * model, const std::string & system, const std::string & user) {
+    const char * tmpl = llama_model_chat_template(model, nullptr);
+    const llama_chat_message msgs[] = {{"system", system.c_str()}, {"user", user.c_str()}};
+    std::vector<char> buf(2 * (system.size() + user.size()) + 256);
+    int n = llama_chat_apply_template(tmpl, msgs, 2, true, buf.data(), (int32_t) buf.size());
+    if (n > (int) buf.size()) {
+        buf.resize(n);
+        n = llama_chat_apply_template(tmpl, msgs, 2, true, buf.data(), (int32_t) buf.size());
+    }
+    if (n < 0) {
+        LOGE("chat template not supported, using ChatML");
+        return "<|im_start|>system\n" + system + "<|im_end|>\n<|im_start|>user\n" + user + "<|im_end|>\n<|im_start|>assistant\n";
+    }
+    return std::string(buf.data(), n);
 }
 
 int thread_count() {
@@ -98,19 +118,16 @@ Java_app_parda_llm_LlamaNative_load(JNIEnv * env, jobject, jstring jpath, jint n
 
 /** Returns UTF-8 bytes (not a jstring: NewStringUTF chokes on 4-byte characters). */
 extern "C" JNIEXPORT jbyteArray JNICALL
-Java_app_parda_llm_LlamaNative_complete(JNIEnv * env, jobject, jlong handle, jstring jprompt,
+Java_app_parda_llm_LlamaNative_complete(JNIEnv * env, jobject, jlong handle, jstring jsystem, jstring juser,
                                         jstring jgrammar, jint max_tokens, jobject sink) {
     // [sink] (may be null) receives the answer piece by piece, so the screen can show it as it is written.
     jmethodID on_token = sink ? env->GetMethodID(env->GetObjectClass(sink), "onToken", "([B)V") : nullptr;
     std::string pending;
     auto * s = reinterpret_cast<Session *>(handle);
     const llama_vocab * vocab = llama_model_get_vocab(s->model);
-    const std::string prompt = to_string(env, jprompt);
+    const std::string prompt = format_chat(s->model, to_string(env, jsystem), to_string(env, juser));
     const std::string grammar = to_string(env, jgrammar);
     const int64_t t0 = ggml_time_us();
-
-    // Every call starts from an empty context: no state carries between requests.
-    llama_memory_clear(llama_get_memory(s->ctx), true);
 
     const int n_prompt = -llama_tokenize(vocab, prompt.c_str(), (int32_t) prompt.size(), nullptr, 0, true, true);
     std::vector<llama_token> tokens(n_prompt);
@@ -119,14 +136,30 @@ Java_app_parda_llm_LlamaNative_complete(JNIEnv * env, jobject, jlong handle, jst
         LOGE("prompt too long: %d tokens", n_prompt);
         return to_bytes(env, "");
     }
-    for (int i = 0; i < n_prompt; i += BATCH) {
+
+    // Prompts share a long fixed opening (instructions, tool list). Keep what the previous prompt
+    // computed for the tokens this one starts with, and drop everything after, including the
+    // previous answer. The result is exactly what a fresh context would give, only sooner.
+    llama_memory_t mem = llama_get_memory(s->ctx);
+    int keep = 0;
+    while (keep < (int) s->cached.size() && keep < n_prompt - 1 && s->cached[keep] == tokens[keep]) keep++;
+    if (!llama_memory_seq_rm(mem, 0, keep, -1)) {
+        // Some caches (sliding-window attention, as in Gemma) cannot be cut part-way.
+        llama_memory_clear(mem, true);
+        keep = 0;
+    }
+    s->cached.clear();
+    for (int i = keep; i < n_prompt; i += BATCH) {
         const int n = std::min(BATCH, n_prompt - i);
         if (llama_decode(s->ctx, llama_batch_get_one(tokens.data() + i, n)) != 0) {
             LOGE("prompt decode failed");
+            llama_memory_clear(mem, true);
             return to_bytes(env, "");
         }
     }
+    s->cached = tokens;
     const int64_t t_prompt = ggml_time_us();
+    LOGI("prompt: reused %d of %d tokens", keep, n_prompt);
 
     llama_sampler * smpl = llama_sampler_chain_init(llama_sampler_chain_default_params());
     if (!grammar.empty()) {

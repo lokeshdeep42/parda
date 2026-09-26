@@ -116,7 +116,10 @@ fun AirlockScreen(initialText: String?, initialImage: Uri? = null) {
                 image = it
                 imageName = displayName(context, uri) ?: "image"
                 fileNote = null
-            }.onFailure { fileNote = "Could not read that image." }
+            }.onFailure {
+                android.util.Log.w("PardaOCR", "could not read image", it)
+                fileNote = "Could not read that image."
+            }
         }
     }
     LaunchedEffect(initialImage) { initialImage?.let(::openImage) }
@@ -164,7 +167,12 @@ fun AirlockScreen(initialText: String?, initialImage: Uri? = null) {
             Text("Mask it before you share it", style = MaterialTheme.typography.bodyLarge, color = Frost.Ink2)
         }
 
-        ModelCard(model, onImport = { pickModel.launch(arrayOf("*/*")) })
+        val installed = remember(model) { store.installedModels().size }
+        ModelCard(
+            model, installed,
+            onImport = { pickModel.launch(arrayOf("*/*")) },
+            onSwitch = { scope.launch(Dispatchers.IO) { store.switchModel() } },
+        )
 
         image?.let { img ->
             ImageCard(img, imageName, onClose = { image = null })
@@ -372,13 +380,14 @@ private fun ImageCard(img: ImageAirlock.Result, name: String, onClose: () -> Uni
 
 /** Which planner is on duty. The model file only ever arrives by hand: nothing is downloaded. */
 @Composable
-private fun ModelCard(model: ModelStatus, onImport: () -> Unit) {
+private fun ModelCard(model: ModelStatus, installed: Int, onImport: () -> Unit, onSwitch: () -> Unit) {
     GlassCard(padding = 16.dp) {
         SectionLabel("Local model")
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 val (title, detail) = when (model) {
-                    is ModelStatus.Ready -> model.name to "Running on this phone's CPU · loaded in ${model.loadMillis} ms"
+                    is ModelStatus.Ready -> model.name to "Running on this phone's CPU · loaded in ${model.loadMillis} ms" +
+                        if (installed > 1) " · $installed models installed" else ""
                     is ModelStatus.Loading -> model.name to "Loading…"
                     is ModelStatus.Failed -> model.name to "Could not load: ${model.reason}. Using the rule-based agent."
                     ModelStatus.Missing -> "Rule-based agent" to "Import a .gguf (e.g. Hammer2.1-1.5B Q4) to plan with a local LLM."
@@ -388,6 +397,8 @@ private fun ModelCard(model: ModelStatus, onImport: () -> Unit) {
             }
             if (model is ModelStatus.Missing || model is ModelStatus.Failed) {
                 Pill("Import", strong = true, onClick = onImport)
+            } else if (model is ModelStatus.Ready && installed > 1) {
+                Pill("Switch", onClick = onSwitch)
             }
         }
     }

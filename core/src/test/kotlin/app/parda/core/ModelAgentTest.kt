@@ -4,7 +4,8 @@ import app.parda.core.agent.AgentGrammar
 import app.parda.core.agent.AgentPlan
 import app.parda.core.agent.DisclosureGate
 import app.parda.core.agent.GateDecision
-import app.parda.core.agent.HammerPrompt
+import app.parda.core.agent.AgentPrompt
+import app.parda.core.agent.ChatPrompt
 import app.parda.core.agent.HandBackReason
 import app.parda.core.agent.LocalTask
 import app.parda.core.agent.ModelAgent
@@ -22,7 +23,7 @@ class ModelAgentTest {
     /** Records what the agent asked for and replies with canned output. */
     private class FakeEngine(private val planOutput: String, private val answerOutput: String = "") : TextEngine {
         val grammars = mutableListOf<String?>()
-        override fun complete(prompt: String, grammar: String?, maxTokens: Int, onToken: (String) -> Unit): String {
+        override fun complete(prompt: ChatPrompt, grammar: String?, maxTokens: Int, onToken: (String) -> Unit): String {
             grammars += grammar
             val out = if (grammar != null) planOutput else answerOutput
             if (grammar == null) out.split(" ").forEach { onToken("$it ") }
@@ -108,10 +109,9 @@ class ModelAgentTest {
         assertTrue(engine.grammars.isEmpty())
     }
 
-    @Test fun `the plan prompt is ChatML with the tool list and the request`() {
-        val p = HammerPrompt.plan("Am I underpaid?", Samples.SALARY_LETTER)
-        assertTrue(p.startsWith("<|im_start|>system\n"))
-        assertTrue(p.endsWith("<|im_start|>assistant\n"))
-        assertTrue("\"hand_back\"" in p && "Request: Am I underpaid?" in p)
+    @Test fun `the plan prompt carries the tool list and the request, not a chat template`() {
+        val p = AgentPrompt.plan("Am I underpaid?", Samples.SALARY_LETTER)
+        assertTrue("\"hand_back\"" in p.user && "Request: Am I underpaid?" in p.user)
+        assertFalse("<|im_start|>" in p.system + p.user, "the engine applies the model's own template")
     }
 }

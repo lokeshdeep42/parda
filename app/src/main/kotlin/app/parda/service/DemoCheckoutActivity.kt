@@ -7,71 +7,106 @@ import android.os.Bundle
 import android.os.CountDownTimer
 import android.view.Gravity
 import android.view.View
+import android.view.accessibility.AccessibilityEvent
 import android.widget.Button
 import android.widget.CheckBox
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import app.parda.core.checkout.DemoCarts
+import app.parda.core.checkout.Money
 
 /**
- * A stand-in shopping checkout with every dark pattern Parda knows, built from plain Android
- * Views so the accessibility tree looks like a real shopping app's. [CheckoutWatchService]
- * ignores Parda's own screens except this one, so the shield can be shown working without
- * depending on a live store's layout on demo day.
+ * A stand-in checkout, one of [DemoCarts] (`--es cart food`), built from plain Android Views so
+ * the accessibility tree looks like a real store's. [CheckoutWatchService] ignores Parda's own
+ * screens except this one, so the shield can be shown working without depending on a live
+ * store's layout on demo day. The total follows the checkboxes, so a removed extra shows.
  */
 class DemoCheckoutActivity : Activity() {
     private var timer: CountDownTimer? = null
+    private val ticked = mutableMapOf<DemoCarts.Line, Boolean>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        title = "Demo store"
+        val cart = DemoCarts.byId(intent.getStringExtra(EXTRA_CART))
+        // A fresh cart: let the shield report it again even if it was just handled.
+        CheckoutWatchService.forget(packageName)
+        title = cart.store
         val list = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(20), dp(48), dp(20), dp(32))
             setBackgroundColor(Color.WHITE)
         }
         list.addView(text("Checkout", 26f, bold = true))
-        list.addView(text("Demo store · not a real shop", 13f, color = Color.GRAY))
+        list.addView(text("${cart.store} · demo store, not a real shop", 13f, color = Color.GRAY))
         list.addView(space())
-        list.addView(line("Cotton kurta, size M", "₹1,299"))
-        list.addView(line("Standard delivery", "Free"))
-        list.addView(tick("Round up and donate to a cause", "₹10"))
-        list.addView(tick("Purchase protection plan", "₹149"))
-        list.addView(tick("Start a 30-day free trial (auto-renews at ₹299/mo)", "Free"))
-        list.addView(line("Handling fee", "₹49"))
-        list.addView(line("Total payable", "₹1,507", bold = true))
-        list.addView(space())
-        val urgency = text("Only 2 left — offer ends in 05:00", 14f, color = Color.rgb(0xB2, 0x3B, 0x1E))
-        list.addView(urgency)
-        list.addView(space())
-        list.addView(Button(this).apply {
-            text = "Pay ₹1,507"
+
+        val totalView = text("", 15f, bold = true)
+        val pay = Button(this).apply {
             isAllCaps = false
             // Deliberately does nothing: Parda never taps Pay, and neither should a demo.
-        })
-        list.addView(text("No thanks, I don't care about supporting local artisans", 13f, color = Color.GRAY).apply {
-            gravity = Gravity.CENTER
-            setPadding(0, dp(12), 0, 0)
-        })
+        }
+        fun refresh() {
+            val total = Money.format(cart.total { ticked[it] == true })
+            totalView.text = total
+            pay.text = "Pay $total"
+        }
+        for (l in cart.lines) {
+            if (l.optional) {
+                ticked[l] = l.kind == DemoCarts.Kind.TICKED
+                list.addView(tick(l.label, l.price, ticked.getValue(l)) { checked -> ticked[l] = checked; refresh() })
+            } else {
+                list.addView(line(l.label, l.price))
+            }
+        }
+        list.addView(row(
+            text("Total payable", 15f, bold = true).apply {
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            },
+            totalView,
+        ))
+        refresh()
+        list.addView(space())
+        val banners = cart.banners.map { b -> text(b, 14f, color = Color.rgb(0xB2, 0x3B, 0x1E)).also(list::addView) }
+        list.addView(space())
+        list.addView(pay)
+        cart.decline?.let {
+            list.addView(text(it, 13f, color = Color.GRAY).apply {
+                gravity = Gravity.CENTER
+                setPadding(0, dp(12), 0, 0)
+            })
+        }
         setContentView(ScrollView(this).apply { addView(list) })
 
-        timer = object : CountDownTimer(5 * 60_000L, 1_000L) {
-            override fun onTick(left: Long) {
-                val s = left / 1000
-                urgency.text = "Only 2 left — offer ends in %02d:%02d".format(s / 60, s % 60)
-            }
-            override fun onFinish() = Unit
-        }.start()
+        // A countdown banner ("ends in 05:00") really counts down, as it would in a store.
+        cart.banners.indexOfFirst { CLOCK.containsMatchIn(it) }.takeIf { it >= 0 }?.let { i ->
+            val template = cart.banners[i]
+            val (m, sec) = CLOCK.find(template)!!.destructured
+            timer = object : CountDownTimer((m.toLong() * 60 + sec.toLong()) * 1000, 1_000L) {
+                override fun onTick(left: Long) {
+                    val s = left / 1000
+                    banners[i].text = template.replace(CLOCK, "%02d:%02d".format(s / 60, s % 60))
+                }
+                override fun onFinish() = Unit
+            }.start()
+        }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        started++
     }
 
     override fun onResume() {
         super.onResume()
-        visible = true
+        // The window-opened event can reach the shield before this screen counts as visible,
+        // and a cart without a countdown sends no more events: announce it once it is up.
+        window.decorView.post { window.decorView.sendAccessibilityEvent(AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED) }
     }
 
-    override fun onPause() {
-        visible = false
-        super.onPause()
+    override fun onStop() {
+        started--
+        super.onStop()
     }
 
     override fun onDestroy() {
@@ -80,12 +115,13 @@ class DemoCheckoutActivity : Activity() {
     }
 
     /** A pre-ticked line item: the checkbox and its price share a row, as in real carts. */
-    private fun tick(label: String, amount: String) = row(
+    private fun tick(label: String, amount: String, checked: Boolean, onChange: (Boolean) -> Unit) = row(
         CheckBox(this).apply {
             text = label
-            isChecked = true
+            isChecked = checked
             textSize = 15f
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            setOnCheckedChangeListener { _, now -> onChange(now) }
         },
         text(amount, 15f),
     )
@@ -119,9 +155,17 @@ class DemoCheckoutActivity : Activity() {
     private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
 
     companion object {
-        /** Read by the service, which runs in this process. */
+        const val EXTRA_CART = "cart"
+        private val CLOCK = Regex("""(\d{2}):(\d{2})""")
+
+        /**
+         * Demo carts on screen. A count, not a flag: when one cart replaces another, the new one
+         * starts before the old one stops.
+         */
         @Volatile
-        var visible: Boolean = false
-            private set
+        private var started = 0
+
+        /** Read by the service, which runs in this process. */
+        val visible: Boolean get() = started > 0
     }
 }

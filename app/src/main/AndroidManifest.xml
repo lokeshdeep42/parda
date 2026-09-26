@@ -85,6 +85,13 @@
             android:label="Demo store"
             android:theme="@android:style/Theme.Material.Light.NoActionBar" />
 
+        <!-- Picks which demo cart to open. Not scanned: only the checkout itself is. -->
+        <activity
+            android:name=".service.DemoStoresActivity"
+            android:exported="false"
+            android:label="Demo stores"
+            android:theme="@android:style/Theme.Material.Light.NoActionBar" />
+
         <!-- Hands a masked image copy to the share sheet; the original file is never exposed. -->
         <provider
             android:name="androidx.core.content.FileProvider"

@@ -22,39 +22,48 @@ object SuggestedQuestions {
         val found = classifier.classify(text).map { it.category }.toSet()
         val lines = text.lines().filter { it.isNotBlank() }
         val tabular = lines.size >= 3 && lines.count { '\t' in it || it.count { c -> c == ',' } >= 3 } > lines.size / 2
-        val list = Suggestion("List personal data", "List the personal data in this document.")
+        // A mostly Hindi document gets its questions in Hindi; the keyword rules route both.
+        val hi = text.count { it in 'ऀ'..'ॿ' } * 3 > text.count { it.isLetter() }
+        fun q(label: String, request: String, hiLabel: String, hiRequest: String) =
+            if (hi) Suggestion(hiLabel, hiRequest) else Suggestion(label, request)
+        val list = q("List personal data", "List the personal data in this document.", "निजी जानकारी", "इस दस्तावेज़ की निजी जानकारी की सूची दें।")
+        fun summarise(request: String) = q("Summarise", request, "सारांश", "इसका सारांश दें।")
 
         return when {
-            has(lower, "statement", "opening balance", "closing balance", "debit", "credit", "withdrawal") -> listOf(
-                Suggestion("Summarise", "Summarise this statement."),
+            has(lower, "statement", "opening balance", "closing balance", "debit", "credit", "withdrawal", "खाता विवरण", "शेष राशि", "निकासी") -> listOf(
+                summarise("Summarise this statement."),
                 list,
-                Suggestion("Unusual spending?", "Compare this spending with typical households and tell me if anything is unusual."),
+                q(
+                    "Unusual spending?", "Compare this spending with typical households and tell me if anything is unusual.",
+                    "असामान्य खर्च?", "इस खर्च की तुलना आम परिवारों से करें और बताएँ कि कुछ असामान्य है क्या।",
+                ),
             )
-            has(lower, "salary", "compensation", "ctc", "payslip", "pay slip", "gross pay", "net pay") && !tabular -> listOf(
-                Suggestion("Summarise", "Summarise the key terms of this letter in three lines."),
-                Suggestion("Am I underpaid?", "Compare this against typical FY26 compensation bands for my role and tell me if I am underpaid."),
+            has(lower, "salary", "compensation", "ctc", "payslip", "pay slip", "gross pay", "net pay", "वेतन") && !tabular -> listOf(
+                summarise("Summarise the key terms of this letter in three lines."),
+                q(
+                    "Am I underpaid?", "Compare this against typical FY26 compensation bands for my role and tell me if I am underpaid.",
+                    "क्या वेतन कम है?", "मेरे पद के लिए बाज़ार के वेतन से इसकी तुलना करें और बताएँ कि क्या मुझे कम मिल रहा है।",
+                ),
             )
-            has(lower, "agreement", "lease", "tenant", "landlord", "clause", "terms and conditions", "hereby") -> listOf(
-                Suggestion("Summarise", "Summarise the key terms of this agreement."),
+            has(lower, "agreement", "lease", "tenant", "landlord", "clause", "terms and conditions", "hereby", "अनुबंध", "समझौता", "किरायेदार", "मकान मालिक") -> listOf(
+                summarise("Summarise the key terms of this agreement."),
                 list,
-                Suggestion("Is it legal?", "Is anything in this agreement against Indian law?"),
+                q("Is it legal?", "Is anything in this agreement against Indian law?", "क्या यह कानूनी है?", "क्या इस अनुबंध में कुछ भारतीय कानून के विरुद्ध है?"),
             )
             DataCategory.GOV_ID in found && lines.size < 30 -> listOf(
                 list,
-                Suggestion("Verify this ID", "Look up whether this ID is valid."),
+                q("Verify this ID", "Look up whether this ID is valid.", "आईडी जाँचें", "इस आईडी को ऑनलाइन जाँचें।"),
             )
             tabular || lines.size > 50 -> listOf(
-                Suggestion("Summarise", "Summarise this file."),
+                summarise("Summarise this file."),
                 list,
-                Suggestion(
+                q(
                     if (DataCategory.MONEY_AMOUNT in found) "Compare amounts" else "Compare with others",
                     "Compare these figures with market rates and tell me what stands out.",
+                    "तुलना करें", "इन आँकड़ों की बाज़ार दरों से तुलना करें।",
                 ),
             )
-            else -> listOf(
-                Suggestion("Summarise", "Summarise this."),
-                list,
-            )
+            else -> listOf(summarise("Summarise this."), list)
         }
     }
 

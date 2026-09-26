@@ -39,7 +39,7 @@ import android.widget.Toast
 import app.parda.data.DocumentReader
 import app.parda.service.CheckoutWatchService
 import kotlin.concurrent.thread
-import app.parda.service.DemoCheckoutActivity
+import app.parda.service.DemoStoresActivity
 import app.parda.ui.components.FrostBackground
 import app.parda.ui.components.Icons
 import app.parda.ui.components.StrokeIcon
@@ -127,7 +127,7 @@ class MainActivity : ComponentActivity() {
                 TAB_HOME -> HomeScreen(
                     serviceOn, totals, egress, entries, ::openAccessibilitySettings,
                     onOpenLedger = { tab = TAB_LEDGER },
-                    onTryDemo = { startActivity(Intent(this@MainActivity, DemoCheckoutActivity::class.java)) },
+                    onTryDemo = { startActivity(Intent(this@MainActivity, DemoStoresActivity::class.java)) },
                 )
                 TAB_FIREWALL -> FirewallScreen(policy, store::setPolicy)
                 TAB_AIRLOCK -> AirlockScreen(sharedText, sharedImage)

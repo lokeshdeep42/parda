@@ -9,7 +9,8 @@ import app.parda.core.detect.Classifier
 class RuleBasedAgent(private val classifier: Classifier = Classifier()) : LocalAgent {
 
     override fun plan(request: String, document: String): AgentPlan {
-        val r = request.lowercase()
+        // NFC, so a nukta typed either way ("ज़" as one or two code points) matches the keywords.
+        val r = java.text.Normalizer.normalize(request.lowercase(), java.text.Normalizer.Form.NFC)
         if (OUTSIDE.any { it in r }) return AgentPlan.HandBack(HandBackReason.NEEDS_OUTSIDE_KNOWLEDGE)
         return when {
             SUMMARISE.any { it in r } -> AgentPlan.AnswerLocally(LocalTask.SUMMARISE)
@@ -51,9 +52,11 @@ class RuleBasedAgent(private val classifier: Classifier = Classifier()) : LocalA
             "compare", "typical", "market", "benchmark", "average", "industry", "latest", "current rate",
             "news", "underpaid", "overpaid", "is this fair", "should i", "research", "search", "look up",
             "legal", " law", "tax rule", "regulation",
-        )
-        val SUMMARISE = listOf("summar", "tl;dr", "tldr", "key terms", "key points", "gist", "in short", "main points")
-        val EXTRACT = listOf("extract", "list the", "pull out", "what are the numbers", "find the", "which amounts")
+            // Hindi: market, compare, law, average, online, typical households
+            "बाज़ार", "बाजार", "तुलना", "कानून", "क़ानून", "औसत", "ऑनलाइन", "आम परिवार",
+        ).map { java.text.Normalizer.normalize(it, java.text.Normalizer.Form.NFC) }
+        val SUMMARISE = listOf("summar", "tl;dr", "tldr", "key terms", "key points", "gist", "in short", "main points", "सारांश")
+        val EXTRACT = listOf("extract", "list the", "pull out", "what are the numbers", "find the", "which amounts", "सूची", "निकाल")
         val SKIP_PREFIXES = listOf("subject:", "dear ", "regards", "thanks", "thank you", "sincerely")
     }
 }

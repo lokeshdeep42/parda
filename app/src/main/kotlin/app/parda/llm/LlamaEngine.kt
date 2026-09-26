@@ -1,5 +1,6 @@
 package app.parda.llm
 
+import app.parda.core.agent.ChatPrompt
 import app.parda.core.agent.TextEngine
 import java.io.Closeable
 import java.io.File
@@ -8,11 +9,11 @@ import java.io.File
 class LlamaEngine private constructor(private var handle: Long, val modelName: String) : TextEngine, Closeable {
 
     @Synchronized
-    override fun complete(prompt: String, grammar: String?, maxTokens: Int, onToken: (String) -> Unit): String {
+    override fun complete(prompt: ChatPrompt, grammar: String?, maxTokens: Int, onToken: (String) -> Unit): String {
         check(handle != 0L) { "engine closed" }
         // Grammar-constrained output is a plan, not text for the user: nothing to stream.
         val sink = if (grammar == null) TokenSink { onToken(it.toString(Charsets.UTF_8)) } else null
-        return LlamaNative.complete(handle, prompt, grammar, maxTokens, sink).toString(Charsets.UTF_8)
+        return LlamaNative.complete(handle, prompt.system, prompt.user, grammar, maxTokens, sink).toString(Charsets.UTF_8)
     }
 
     @Synchronized
@@ -52,6 +53,6 @@ internal object LlamaNative {
 
     @JvmStatic external fun init(nativeLibDir: String)
     @JvmStatic external fun load(path: String, nCtx: Int): Long
-    @JvmStatic external fun complete(handle: Long, prompt: String, grammar: String?, maxTokens: Int, sink: TokenSink?): ByteArray
+    @JvmStatic external fun complete(handle: Long, system: String, user: String, grammar: String?, maxTokens: Int, sink: TokenSink?): ByteArray
     @JvmStatic external fun free(handle: Long)
 }

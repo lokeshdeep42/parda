@@ -46,7 +46,8 @@ object AddressDetector : Detector {
     override val category = DataCategory.ADDRESS
     override val name = "Address"
     private val pin = Regex("""(?<!\d)[1-9]\d{2}\s?\d{3}(?!\d)""")
-    private val label = Regex("""^\s*[A-Za-z][A-Za-z ]{0,30}:\s*""")
+    // OCR often reads a colon after Devanagari as the visarga (ः), which looks the same.
+    private val label = Regex("""^\s*[A-Za-z\u0900-\u097F][A-Za-z\u0900-\u097F ]{0,30}[:\u0903]\s*""")
 
     override fun find(text: String): List<Detection> {
         val out = mutableListOf<Detection>()
@@ -152,7 +153,10 @@ object Detectors {
         DataCategory.MONEY_AMOUNT, "Amount",
         Regex(
             """(?:₹|\bRs\.?|\bINR)\s?\d[\d,]*(?:\.\d{1,2})?(?:\s?(?:lakhs?|crores?|cr|L|k)\b)?""" +
-                """|\b\d+(?:\.\d+)?\s?(?:LPA|lakhs?|crores?)\b""",
+                """|\b\d+(?:\.\d+)?\s?(?:LPA|lakhs?|crores?)\b""" +
+                // Hindi: "रु. 24,000", "18,40,000 रुपये", "18 लाख"
+                """|(?<![\u0900-\u097F])(?:रु\.?|रुपये)[ \t]?\d[\d,]*(?:\.\d{1,2})?""" +
+                """|(?<![\d,])\d[\d,]*(?:\.\d{1,2})?[ \t]?(?:रुपये|रुपए|लाख|करोड़)""",
         ),
     )
     private const val CAP = """[A-Z][a-z]+"""
@@ -168,9 +172,27 @@ object Detectors {
         accept = { it !in setOf("Sir", "Madam", "Customer", "Team", "User", "Friend", "All") },
     )
 
+    // Devanagari: letters and vowel signs, without the danda (।) or Devanagari digits. A Hindi
+    // name runs at most three words and stops at a postposition ("राजेश कुमार को" -> "राजेश कुमार").
+    private const val DEVA = """[\u0900-\u0963\u0971-\u097F]+"""
+    private const val NOT_POSTPOSITION = """(?!(?:को|का|की|के|ने|से|में|पर|और|है|जी)(?![\u0900-\u097F]))"""
+    private const val NAME_HI = """$DEVA(?:[ \t]+$NOT_POSTPOSITION$DEVA){0,2}"""
+    val NAME_HONORIFIC_HI = RegexDetector(
+        DataCategory.PERSON_NAME, "Name",
+        Regex("""(?<![\u0900-\u097F])(?:श्रीमती|श्री|सुश्री|कुमारी|डॉ\.?)[ \t]+(?<v>$NAME_HI)"""),
+    )
+    val NAME_LABELLED_HI = RegexDetector(
+        DataCategory.PERSON_NAME, "Name",
+        Regex("""(?:(?<![\u0900-\u097F])नाम[ \t]*[:\u0903\-][ \t]*|(?<![\u0900-\u097F])प्रिय[ \t]+(?!श्री|सुश्री|कुमारी|डॉ))(?<v>$NAME_HI|$NAME)"""),
+    )
+    val DOB_HI = RegexDetector(
+        DataCategory.DATE_OF_BIRTH, "Date of birth",
+        Regex("""(?:जन्म[ \t]*(?:तिथि|तारीख)|जन्मतिथि)[ \t]*[:\u0903\-]?[ \t]*(?<v>\d{1,2}[/.\- ]\d{1,2}[/.\- ]\d{2,4})"""),
+    )
+
     val DEFAULT: List<Detector> = listOf(
         EMAIL, AADHAAR, MASKED_AADHAAR, PAN, CARD, AddressDetector, PHONE, BANK_ACCOUNT,
-        DOB, MONEY, NAME_HONORIFIC, NAME_LABELLED,
+        DOB, DOB_HI, MONEY, NAME_HONORIFIC, NAME_LABELLED, NAME_HONORIFIC_HI, NAME_LABELLED_HI,
     )
 }
 
