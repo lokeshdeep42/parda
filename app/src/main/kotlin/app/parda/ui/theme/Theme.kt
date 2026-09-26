@@ -72,8 +72,9 @@ private fun localized(base: Typography, hindi: Boolean): Typography {
 
 @Composable
 fun PardaTheme(content: @Composable () -> Unit) {
-    val hindi = LocalConfiguration.current.locales[0].language == "hi"
-    val typography = remember(hindi) { localized(typography, hindi) }
+    // Hindi and Telugu both lose the Latin design's tight tracking.
+    val indic = LocalConfiguration.current.locales[0].language in setOf("hi", "te")
+    val typography = remember(indic) { localized(typography, indic) }
     MaterialTheme(
         colorScheme = lightColorScheme(
             primary = Frost.Night,
