@@ -1,6 +1,9 @@
 package app.parda.ui.components
 
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.material3.DropdownMenu
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.BorderStroke
@@ -178,4 +181,47 @@ object Icons {
 @Composable
 fun StrokeIcon(icon: ImageVector, tint: Color = Frost.Ink, size: Dp = 22.dp, contentDescription: String? = null) {
     androidx.compose.material3.Icon(icon, contentDescription, Modifier.size(size), tint = tint)
+}
+
+/** A frosted pop-up menu: a white glass card with rounded rows, used in place of the stock menu. */
+@Composable
+fun FrostMenu(expanded: Boolean, onDismiss: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
+    DropdownMenu(
+        expanded = expanded,
+        onDismissRequest = onDismiss,
+        modifier = Modifier.widthIn(min = 240.dp),
+        shape = RoundedCornerShape(22.dp),
+        containerColor = Color.White,
+        tonalElevation = 0.dp,
+        shadowElevation = 12.dp,
+        border = BorderStroke(1.dp, Frost.GlassEdge),
+        content = content,
+    )
+}
+
+/** One choice in a [FrostMenu]. The current one is tinted and carries a dark check. */
+@Composable
+fun FrostMenuItem(title: String, detail: String? = null, selected: Boolean = false, onClick: () -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 6.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(if (selected) Frost.Ground.copy(alpha = 0.7f) else Color.Transparent)
+            .clickable(role = Role.Button, onClick = onClick)
+            .semantics { this.selected = selected }
+            .padding(horizontal = 12.dp, vertical = 11.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.titleMedium, color = Frost.Ink)
+            detail?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = Frost.Ink2) }
+        }
+        if (selected) {
+            Box(Modifier.size(26.dp).clip(CircleShape).background(Frost.Night), contentAlignment = Alignment.Center) {
+                StrokeIcon(Icons.Check, tint = Color.White, size = 15.dp)
+            }
+        }
+    }
 }

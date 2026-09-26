@@ -12,8 +12,8 @@ import androidx.compose.ui.semantics.semantics
 import app.parda.ui.title
 import android.text.format.DateUtils
 import androidx.compose.foundation.layout.Box
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.DropdownMenu
+import app.parda.ui.components.FrostMenu
+import app.parda.ui.components.FrostMenuItem
 import androidx.compose.foundation.horizontalScroll
 import app.parda.core.document.SuggestedQuestions
 import app.parda.core.agent.Planner
@@ -43,6 +43,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.MaterialTheme
@@ -475,14 +476,19 @@ private fun ModelCard(model: ModelStatus, installed: List<Pair<String, Long>>, o
                 Box {
                     Pill(stringResource(R.string.air_switch), onClick = { menu = true })
                     // Every installed model, in the benchmark's order; the one running is ticked.
-                    DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                        installed.forEach { (name, bytes) ->
-                            DropdownMenuItem(
-                                text = { Text((if (name == modelName(model)) "✓ " else "") + name + " · " + "%.1f GB".format(bytes / 1e9)) },
+                    FrostMenu(expanded = menu, onDismiss = { menu = false }) {
+                        val recommended = stringResource(R.string.air_model_recommended)
+                        installed.forEachIndexed { i, (name, bytes) ->
+                            val size = "%.1f GB".format(bytes / 1e9)
+                            FrostMenuItem(
+                                title = name,
+                                detail = if (i == 0) "$size · $recommended" else size,
+                                selected = name == modelName(model),
                                 onClick = { menu = false; if (name != modelName(model)) onPick(name) },
                             )
                         }
-                        DropdownMenuItem(text = { Text(stringResource(R.string.air_import_another)) }, onClick = { menu = false; onImport() })
+                        Box(Modifier.padding(horizontal = 18.dp, vertical = 4.dp).fillMaxWidth().height(1.dp).background(Frost.Ground))
+                        FrostMenuItem(stringResource(R.string.air_import_another), onClick = { menu = false; onImport() })
                     }
                 }
             }

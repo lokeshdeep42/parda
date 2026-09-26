@@ -8,6 +8,11 @@
             android:name="app.parda.service.DemoCheckoutActivity"
             android:exported="true"
             tools:replace="android:exported" />
+        <!-- And the store picker, for screenshots of it. -->
+        <activity
+            android:name="app.parda.service.DemoStoresActivity"
+            android:exported="true"
+            tools:replace="android:exported" />
         <activity
             android:name="app.parda.bench.ModelWakeCheckActivity"
             android:exported="true"

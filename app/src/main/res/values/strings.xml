@@ -225,6 +225,7 @@
     <string name="ds_movie">movie tickets</string>
     <string name="ds_grocery">groceries</string>
     <string name="ds_honest">books, no tricks</string>
+    <string name="air_model_recommended">Recommended</string>
     <plurals name="pl_decisions">
         <item quantity="one">%d decision</item>
         <item quantity="other">%d decisions</item>
@@ -268,5 +269,9 @@
     <plurals name="pl_notif_flagged">
         <item quantity="one">Parda flagged %1$d thing in %2$s</item>
         <item quantity="other">Parda flagged %1$d things in %2$s</item>
+    </plurals>
+    <plurals name="pl_tricks">
+        <item quantity="one">%d trick</item>
+        <item quantity="other">%d tricks</item>
     </plurals>
 </resources>

@@ -33,6 +33,27 @@ object DemoCarts {
         /** What Pay charges, in paise, given which extras are ticked (by default, as the store serves it). */
         fun total(ticked: (Line) -> Boolean = { it.kind == Kind.TICKED }): Long =
             lines.filter { !it.optional || ticked(it) }.sumOf { Money.oneOffAmounts(it.price).firstOrNull() ?: 0 }
+
+        /**
+         * The cart as the demo store's accessibility tree, the way the shield reads it: one row per
+         * line, the checkbox beside its price, then the total, banners, Pay and the decline link.
+         */
+        fun screen(unticked: Set<String> = emptySet()): ScreenNode {
+            val ticked = { l: Line -> l.kind == Kind.TICKED && l.label !in unticked }
+            val rows = lines.mapIndexed { i, l ->
+                val label = if (l.optional) ScreenNode("cb$i", text = l.label, checkable = true, checked = ticked(l)) else ScreenNode("l$i", text = l.label)
+                ScreenNode("row$i", children = listOf(label, ScreenNode("p$i", text = l.price)))
+            }
+            val total = Money.format(total(ticked))
+            return ScreenNode(
+                "root",
+                children = listOf(ScreenNode("title", text = "Checkout"), ScreenNode("store", text = store)) + rows +
+                    ScreenNode("total", children = listOf(ScreenNode("tl", text = "Total payable"), ScreenNode("tv", text = total))) +
+                    banners.mapIndexed { i, b -> ScreenNode("b$i", text = b) } +
+                    ScreenNode("pay", text = "Pay $total") +
+                    listOfNotNull(decline?.let { ScreenNode("decline", text = it) }),
+            )
+        }
     }
 
     val FASHION = Cart(
