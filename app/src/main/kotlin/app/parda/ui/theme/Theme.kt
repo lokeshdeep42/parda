@@ -1,5 +1,8 @@
 package app.parda.ui.theme
 
+import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.text.style.LineBreak
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
 import androidx.compose.material3.lightColorScheme
@@ -53,8 +56,24 @@ private val typography = Typography(
     labelSmall = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.5.sp),
 )
 
+/**
+ * Devanagari titles broke inside words ("फ़ायरवॉ / ल"): the tight tracking of the Latin design
+ * and Android's default breaking of large text do not suit it. Hindi gets normal tracking, and
+ * titles in every language break simply, only between words.
+ */
+private fun localized(base: Typography, hindi: Boolean): Typography {
+    fun TextStyle.fit() = copy(lineBreak = LineBreak.Simple, letterSpacing = if (hindi) 0.sp else letterSpacing)
+    return base.copy(
+        headlineLarge = base.headlineLarge.fit(),
+        headlineMedium = base.headlineMedium.fit(),
+        titleLarge = base.titleLarge.fit(),
+    )
+}
+
 @Composable
 fun PardaTheme(content: @Composable () -> Unit) {
+    val hindi = LocalConfiguration.current.locales[0].language == "hi"
+    val typography = remember(hindi) { localized(typography, hindi) }
     MaterialTheme(
         colorScheme = lightColorScheme(
             primary = Frost.Night,
