@@ -40,6 +40,9 @@ object Frost {
         DarkPatternKind.DRIP_PRICING -> Color(0xFFF4AE7A)
         DarkPatternKind.CONFIRM_SHAMING -> Color(0xFFEE7F7F)
         DarkPatternKind.SUBSCRIPTION_TRAP -> Color(0xFFB7A6EE)
+        DarkPatternKind.FORCED_ACTION -> Color(0xFF9FD3B8)
+        DarkPatternKind.PAY_FOR_PRIORITY -> Color(0xFFE9A6C9)
+        DarkPatternKind.TRICK_WORDING -> Color(0xFFA9B3C2)
     }
 }
 

@@ -32,18 +32,27 @@ enum class DisclosureAction(val label: String) {
     ALLOW("Let it pass"),
 }
 
-/** Tricks Parda recognises at the money boundary (Channel A). */
+/**
+ * Tricks Parda recognises at the money boundary (Channel A). [code] is the pattern's number in
+ * Annexure 1 of the CCPA Guidelines for Prevention and Regulation of Dark Patterns, 2023.
+ */
 @Serializable
 enum class DarkPatternKind(val label: String, val hint: String, val code: String) {
-    BASKET_SNEAKING("Pre-ticked add-ons", "Insurance, tips, donations", "CCPA 1"),
-    FALSE_URGENCY("Fake urgency", "Timers that reset, “only 2 left”", "CCPA 2"),
-    SUBSCRIPTION_TRAP("Subscription traps", "Free trials that auto-renew", "CCPA 3"),
-    CONFIRM_SHAMING("Confirmshaming", "“No thanks, I don’t like saving”", "CCPA 4"),
-    DRIP_PRICING("Last-step fees", "Charges that appear at payment", "CCPA 6"),
+    BASKET_SNEAKING("Pre-ticked add-ons", "Insurance, tips, donations", "CCPA 2"),
+    FALSE_URGENCY("Fake urgency", "Timers that reset, “only 2 left”", "CCPA 1"),
+    SUBSCRIPTION_TRAP("Subscription traps", "Memberships and trials that renew", "CCPA 5"),
+    CONFIRM_SHAMING("Confirmshaming", "“No, I will take the risk”", "CCPA 3"),
+    DRIP_PRICING("Last-step fees", "Charges that appear at payment", "CCPA 8"),
+    /** A box ticked for the user that signs them up or opts them in: a loyalty club, promotions. */
+    FORCED_ACTION("Pre-ticked sign-ups", "Loyalty clubs, promotional messages", "CCPA 4"),
+    /** Paying extra is presented as the way to be served sooner: "tip for faster pickup", fare boosts. */
+    PAY_FOR_PRIORITY("Pay for priority", "“Add a tip for faster pickup”", "CCPA 6"),
+    /** Wording that makes the user untick to decline, or reads the opposite of what it does. */
+    TRICK_WORDING("Trick wording", "“Untick if you don’t want…”", "CCPA 11"),
     ;
 
     /** Only pre-ticked items can be undone by unticking them; everything else is disclosed. */
-    val fixable: Boolean get() = this == BASKET_SNEAKING || this == SUBSCRIPTION_TRAP
+    val fixable: Boolean get() = this == BASKET_SNEAKING || this == SUBSCRIPTION_TRAP || this == FORCED_ACTION
 }
 
 /** What Parda does when a dark pattern is found. Parda never taps Pay. */
@@ -111,6 +120,9 @@ data class Policy(
             DarkPatternKind.SUBSCRIPTION_TRAP to CheckoutAction.ASK_ME,
             DarkPatternKind.CONFIRM_SHAMING to CheckoutAction.FLAG_ONLY,
             DarkPatternKind.DRIP_PRICING to CheckoutAction.ASK_ME,
+            DarkPatternKind.FORCED_ACTION to CheckoutAction.ASK_ME,
+            DarkPatternKind.PAY_FOR_PRIORITY to CheckoutAction.ASK_ME,
+            DarkPatternKind.TRICK_WORDING to CheckoutAction.FLAG_ONLY,
         )
     }
 }

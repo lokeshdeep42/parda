@@ -225,6 +225,13 @@
     <string name="ds_movie">movie tickets</string>
     <string name="ds_grocery">groceries</string>
     <string name="ds_honest">books, no tricks</string>
+    <string name="kind_forced">Pre-ticked sign-ups</string>
+    <string name="kind_forced_hint">Loyalty clubs, promotional messages</string>
+    <string name="kind_priority">Pay for priority</string>
+    <string name="kind_priority_hint">“Add a tip for faster pickup”</string>
+    <string name="kind_trick">Trick wording</string>
+    <string name="kind_trick_hint">“Untick if you don’t want…”</string>
+    <string name="sheet_on_record">On record</string>
     <string name="air_model_recommended">Recommended</string>
     <plurals name="pl_decisions">
         <item quantity="one">%d decision</item>

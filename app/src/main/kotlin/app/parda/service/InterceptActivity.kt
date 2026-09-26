@@ -58,6 +58,7 @@ import androidx.compose.ui.unit.dp
 import app.parda.core.policy.DarkPatternKind
 import app.parda.core.checkout.Finding
 import app.parda.core.checkout.Money
+import app.parda.core.checkout.Precedents
 import app.parda.core.ledger.Channel
 import app.parda.core.ledger.Verdict
 import app.parda.store
@@ -211,6 +212,13 @@ private fun Sheet(
                 Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
+            Precedents.forApp(intercept.packageName, intercept.appLabel)?.let { p ->
+                // Not hypothetical: the regulator has already acted against this app for tricks like these.
+                Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(Frost.WarnBg).padding(horizontal = 14.dp, vertical = 10.dp)) {
+                    Text(stringResource(R.string.sheet_on_record), style = MaterialTheme.typography.labelMedium, color = Frost.WarnInk)
+                    Text(p.summary, style = MaterialTheme.typography.bodyMedium, color = Frost.WarnInk)
+                }
+            }
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 findings.forEach { f -> FindingRow(f, remove[f.key] == true) { remove[f.key] = it } }
             }

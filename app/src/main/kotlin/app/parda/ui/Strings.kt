@@ -32,6 +32,9 @@ val DarkPatternKind.title: String
             DarkPatternKind.SUBSCRIPTION_TRAP -> R.string.kind_subscription
             DarkPatternKind.CONFIRM_SHAMING -> R.string.kind_shaming
             DarkPatternKind.DRIP_PRICING -> R.string.kind_drip
+            DarkPatternKind.FORCED_ACTION -> R.string.kind_forced
+            DarkPatternKind.PAY_FOR_PRIORITY -> R.string.kind_priority
+            DarkPatternKind.TRICK_WORDING -> R.string.kind_trick
         },
     )
 
@@ -43,6 +46,9 @@ val DarkPatternKind.hintText: String
             DarkPatternKind.SUBSCRIPTION_TRAP -> R.string.kind_subscription_hint
             DarkPatternKind.CONFIRM_SHAMING -> R.string.kind_shaming_hint
             DarkPatternKind.DRIP_PRICING -> R.string.kind_drip_hint
+            DarkPatternKind.FORCED_ACTION -> R.string.kind_forced_hint
+            DarkPatternKind.PAY_FOR_PRIORITY -> R.string.kind_priority_hint
+            DarkPatternKind.TRICK_WORDING -> R.string.kind_trick_hint
         },
     )
 

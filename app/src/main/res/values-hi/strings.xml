@@ -225,6 +225,13 @@
     <string name="ds_movie">फ़िल्म टिकट</string>
     <string name="ds_grocery">किराना</string>
     <string name="ds_honest">किताबें, कोई चाल नहीं</string>
+    <string name="kind_forced">पहले से चुने साइन-अप</string>
+    <string name="kind_forced_hint">लॉयल्टी क्लब, प्रचार संदेश</string>
+    <string name="kind_priority">जल्दी के लिए ज़्यादा भुगतान</string>
+    <string name="kind_priority_hint">“जल्दी पिकअप के लिए टिप दें”</string>
+    <string name="kind_trick">उलझाने वाले शब्द</string>
+    <string name="kind_trick_hint">“न चाहें तो टिक हटाएँ…”</string>
+    <string name="sheet_on_record">रिकॉर्ड पर</string>
     <string name="air_model_recommended">सुझाया गया</string>
     <plurals name="pl_decisions">
         <item quantity="one">%d फ़ैसला</item>
