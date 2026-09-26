@@ -5,7 +5,6 @@ import app.parda.core.checkout.DarkPatternScanner
 import app.parda.core.checkout.DemoCarts
 import app.parda.core.checkout.DemoCarts.Cart
 import app.parda.core.checkout.DemoCarts.Kind
-import app.parda.core.checkout.Money
 import app.parda.core.checkout.ScreenNode
 import app.parda.core.policy.DarkPatternKind
 import app.parda.core.policy.DarkPatternKind.BASKET_SNEAKING
@@ -27,22 +26,7 @@ class DemoCartsTest {
     private val scanner = DarkPatternScanner()
 
     /** The accessibility tree of the demo store: one row per line, the checkbox beside its price. */
-    private fun app(cart: Cart, unticked: Set<String> = emptySet()): ScreenNode {
-        val ticked = { l: DemoCarts.Line -> l.kind == Kind.TICKED && l.label !in unticked }
-        val rows = cart.lines.mapIndexed { i, l ->
-            val label = if (l.optional) ScreenNode("cb$i", text = l.label, checkable = true, checked = ticked(l)) else ScreenNode("l$i", text = l.label)
-            ScreenNode("row$i", children = listOf(label, ScreenNode("p$i", text = l.price)))
-        }
-        val total = Money.format(cart.total(ticked))
-        return ScreenNode(
-            "root",
-            children = listOf(ScreenNode("title", text = "Checkout"), ScreenNode("store", text = cart.store)) + rows +
-                ScreenNode("total", children = listOf(ScreenNode("tl", text = "Total payable"), ScreenNode("tv", text = total))) +
-                cart.banners.mapIndexed { i, b -> ScreenNode("b$i", text = b) } +
-                ScreenNode("pay", text = "Pay $total") +
-                listOfNotNull(cart.decline?.let { ScreenNode("decline", text = it) }),
-        )
-    }
+    private fun app(cart: Cart, unticked: Set<String> = emptySet()): ScreenNode = cart.screen(unticked)
 
     /** The same cart as a web page in Chrome: everything is a sibling, the price follows its label. */
     private fun web(cart: Cart) = ScreenNode("root", children = app(cart).children.flatMap { if (it.children.isEmpty()) listOf(it) else it.children })

@@ -225,6 +225,7 @@
     <string name="ds_movie">फ़िल्म टिकट</string>
     <string name="ds_grocery">किराना</string>
     <string name="ds_honest">किताबें, कोई चाल नहीं</string>
+    <string name="air_model_recommended">सुझाया गया</string>
     <plurals name="pl_decisions">
         <item quantity="one">%d फ़ैसला</item>
         <item quantity="other">%d फ़ैसले</item>
@@ -268,5 +269,9 @@
     <plurals name="pl_notif_flagged">
         <item quantity="one">Parda ने %2$s में %1$d चीज़ पर ध्यान दिलाया</item>
         <item quantity="other">Parda ने %2$s में %1$d चीज़ों पर ध्यान दिलाया</item>
+    </plurals>
+    <plurals name="pl_tricks">
+        <item quantity="one">%d चाल</item>
+        <item quantity="other">%d चालें</item>
     </plurals>
 </resources>

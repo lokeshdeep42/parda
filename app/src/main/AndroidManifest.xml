@@ -129,7 +129,7 @@
             android:name=".service.DemoStoresActivity"
             android:exported="false"
             android:label="Demo stores"
-            android:theme="@android:style/Theme.Material.Light.NoActionBar" />
+            android:theme="@style/Theme.Parda" />
 
         <!-- Hands a masked image copy to the share sheet; the original file is never exposed. -->
         <provider

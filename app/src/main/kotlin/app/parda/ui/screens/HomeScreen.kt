@@ -4,8 +4,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.DropdownMenu
+import app.parda.ui.components.FrostMenu
+import app.parda.ui.components.FrostMenuItem
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import app.parda.ui.components.asHeading
@@ -88,10 +88,11 @@ fun HomeScreen(
                 val current = AppLanguage.current(context)
                 Box {
                     Pill(AppLanguage.choices.first { it.first == current }.second + " ▾", onClick = { languages = true })
-                    DropdownMenu(expanded = languages, onDismissRequest = { languages = false }) {
+                    FrostMenu(expanded = languages, onDismiss = { languages = false }) {
                         AppLanguage.choices.forEach { (code, name) ->
-                            DropdownMenuItem(
-                                text = { Text((if (code == current) "✓ " else "") + name) },
+                            FrostMenuItem(
+                                title = name,
+                                selected = code == current,
                                 onClick = { languages = false; if (code != current) AppLanguage.set(context, code) },
                             )
                         }

@@ -225,6 +225,7 @@
     <string name="ds_movie">సినిమా టికెట్లు</string>
     <string name="ds_grocery">కిరాణా</string>
     <string name="ds_honest">పుస్తకాలు, మోసాలు లేవు</string>
+    <string name="air_model_recommended">సిఫార్సు చేసినది</string>
     <plurals name="pl_decisions">
         <item quantity="one">%d నిర్ణయం</item>
         <item quantity="other">%d నిర్ణయాలు</item>
@@ -268,5 +269,9 @@
     <plurals name="pl_notif_flagged">
         <item quantity="one">Parda %2$s లో %1$d విషయాన్ని గుర్తించింది</item>
         <item quantity="other">Parda %2$s లో %1$d విషయాలను గుర్తించింది</item>
+    </plurals>
+    <plurals name="pl_tricks">
+        <item quantity="one">%d మోసం</item>
+        <item quantity="other">%d మోసాలు</item>
     </plurals>
 </resources>
