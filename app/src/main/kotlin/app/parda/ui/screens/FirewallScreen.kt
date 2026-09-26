@@ -1,5 +1,8 @@
 package app.parda.ui.screens
 
+import app.parda.ui.components.SectionLabel
+import androidx.compose.ui.platform.LocalContext
+import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -77,6 +80,23 @@ fun FirewallScreen(policy: Policy, onPolicy: (Policy) -> Unit) {
                 "Parda never taps Pay. Auto-remove only unticks boxes it found pre-ticked; everything else is shown to you.",
                 style = MaterialTheme.typography.bodyMedium, color = Frost.Ink2,
             )
+            // Rules the user accepted on a checkout sheet ("next time, remove these here").
+            val rules = policy.perApp.flatMap { (app, kinds) -> kinds.map { app to it } }
+            if (rules.isNotEmpty()) {
+                val context = LocalContext.current
+                GlassCard(radius = 26.dp, padding = 16.dp) {
+                    SectionLabel("Removed without asking, in these apps only")
+                    rules.forEach { (app, kind) ->
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f)) {
+                                Text(appName(context, app), style = MaterialTheme.typography.titleMedium)
+                                Text(kind.label, style = MaterialTheme.typography.bodyMedium, color = Frost.Ink2)
+                            }
+                            Pill("Ask me again", onClick = { onPolicy(policy.autoRemove(app, kind, false)) })
+                        }
+                    }
+                }
+            }
         } else {
             GlassCard(radius = 26.dp, padding = 0.dp, spacing = 0.dp) {
                 DataCategory.entries.forEachIndexed { i, cat ->
@@ -125,3 +145,7 @@ private fun nextCheckout(kind: DarkPatternKind, current: CheckoutAction): Checko
 
 private fun nextDisclosure(current: DisclosureAction): DisclosureAction =
     DisclosureAction.entries[(current.ordinal + 1) % DisclosureAction.entries.size]
+
+private fun appName(context: Context, pkg: String): String = if (pkg == context.packageName) "Demo stores" else runCatching {
+    context.packageManager.getApplicationLabel(context.packageManager.getApplicationInfo(pkg, 0)).toString()
+}.getOrDefault(pkg)

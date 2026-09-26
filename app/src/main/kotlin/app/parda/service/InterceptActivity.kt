@@ -40,6 +40,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
+import app.parda.core.policy.DarkPatternKind
 import app.parda.core.checkout.Finding
 import app.parda.core.checkout.Money
 import app.parda.core.ledger.Channel
@@ -70,7 +71,14 @@ class InterceptActivity : ComponentActivity() {
             PardaTheme {
                 key(current) {
                     BackHandler { keep(current) }
-                    Sheet(current, onRemove = { remove(current, it) }, onKeep = { keep(current) })
+                    val offers = remember(current) {
+                        store.learningOffers(current.packageName, current.plan.ask.filter { it.fixable }.map { it.kind })
+                    }
+                    Sheet(
+                        current, offers,
+                        onRemove = { approved, learn -> remove(current, approved, learn) },
+                        onKeep = { keep(current) },
+                    )
                 }
             }
         }
@@ -98,7 +106,15 @@ class InterceptActivity : ComponentActivity() {
             private set
     }
 
-    private fun remove(intercept: Intercept, approved: List<Finding>) {
+    private fun remove(intercept: Intercept, approved: List<Finding>, learn: Set<DarkPatternKind>) {
+        // The user ticked "next time, remove these here": a rule for this app only.
+        learn.forEach { store.setAutoRemove(intercept.packageName, it, true) }
+        if (learn.isNotEmpty()) {
+            store.record(
+                Channel.A, Verdict.FIXED,
+                "From now on Parda removes ${learn.joinToString { it.label.lowercase() }} in ${intercept.appLabel} without asking",
+            )
+        }
         val service = CheckoutWatchService.instance
         if (approved.isNotEmpty() && service != null) {
             service.applyFixes(intercept.packageName, approved.map { it.key }.toSet())
@@ -115,9 +131,16 @@ class InterceptActivity : ComponentActivity() {
 }
 
 @Composable
-private fun Sheet(intercept: Intercept, onRemove: (List<Finding>) -> Unit, onKeep: () -> Unit) {
+private fun Sheet(
+    intercept: Intercept,
+    offers: List<DarkPatternKind>,
+    onRemove: (List<Finding>, Set<DarkPatternKind>) -> Unit,
+    onKeep: () -> Unit,
+) {
     val findings = intercept.plan.ask
     val remove = remember { mutableStateMapOf<String, Boolean>().apply { findings.filter { it.fixable }.forEach { put(it.key, true) } } }
+    // Off until the user ticks it: Parda offers to remember, it never decides to.
+    val learn = remember { mutableStateMapOf<DarkPatternKind, Boolean>() }
     val saving = findings.filter { it.fixable && remove[it.key] == true }.sumOf { it.cost }
     val monthly = findings.filter { it.fixable && remove[it.key] == true }.sumOf { it.recurring }
 
@@ -160,12 +183,37 @@ private fun Sheet(intercept: Intercept, onRemove: (List<Finding>) -> Unit, onKee
                         style = MaterialTheme.typography.headlineMedium,
                     )
                 }
+                if (monthly > 0) {
+                    // A monthly charge reads small; the year it adds up to is what the user agrees to.
+                    Text(
+                        "That's ${Money.format(monthly * 12)} a year you didn't choose.",
+                        style = MaterialTheme.typography.bodyMedium, color = Frost.WarnInk,
+                        modifier = Modifier.padding(horizontal = 4.dp),
+                    )
+                }
+            }
+
+            offers.forEach { kind ->
+                val on = learn[kind] == true
+                Row(
+                    Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(Frost.GlassStrong)
+                        .toggleable(on, role = Role.Checkbox) { learn[kind] = it }
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Text(
+                        "You've removed ${kind.label.lowercase()} here before. Next time in ${intercept.appLabel}, remove them without asking.",
+                        style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f),
+                    )
+                    Checkbox(checked = on, onCheckedChange = null, colors = CheckboxDefaults.colors(checkedColor = Frost.Night))
+                }
             }
 
             val approved = findings.filter { it.fixable && remove[it.key] == true }
             PrimaryButton(
                 if (approved.isEmpty()) "Continue" else "Remove add-ons & continue",
-                onClick = { onRemove(approved) },
+                onClick = { onRemove(approved, learn.filterValues { it }.keys) },
             )
             QuietButton("Keep everything", onClick = onKeep)
         }
@@ -184,7 +232,8 @@ private fun FindingRow(f: Finding, checked: Boolean, onChecked: (Boolean) -> Uni
         Column(Modifier.weight(1f)) {
             Text(f.evidence, style = MaterialTheme.typography.titleMedium, maxLines = 2)
             Text(
-                "${f.kind.label} · ${f.kind.code}" + if (f.recurring > 0) " · then ${Money.format(f.recurring)}/mo" else "",
+                "${f.kind.label} · ${f.kind.code}" +
+                    if (f.recurring > 0) " · then ${Money.format(f.recurring)}/mo, ${Money.format(f.recurring * 12)}/yr" else "",
                 style = MaterialTheme.typography.bodyMedium, color = Frost.Ink2,
             )
         }

@@ -8,6 +8,8 @@ import app.parda.core.agent.DisclosureGate
 import app.parda.core.agent.ModelAgent
 import app.parda.core.agent.RuleBasedAgent
 import app.parda.core.checkout.DarkPatternScanner
+import app.parda.core.policy.DarkPatternKind
+import app.parda.core.checkout.RemovalHistory
 import app.parda.core.disclosure.Sanitizer
 import app.parda.core.ledger.Channel
 import app.parda.core.ledger.Ledger
@@ -71,6 +73,24 @@ class PardaStore(context: Context) {
         _onboarded.value = true
         prefs.edit().putBoolean(KEY_ONBOARDED, true).apply()
     }
+
+    private var removals: RemovalHistory = prefs.getString(KEY_REMOVALS, null)
+        ?.let { runCatching { json.decodeFromString(RemovalHistory.serializer(), it) }.getOrNull() }
+        ?: RemovalHistory()
+
+    /** Counts what the user removed in [app], so Parda can offer to do it for them there. */
+    @Synchronized
+    fun recordRemovals(app: String, kinds: Collection<DarkPatternKind>) {
+        removals = removals.record(app, kinds)
+        prefs.edit().putString(KEY_REMOVALS, json.encodeToString(RemovalHistory.serializer(), removals)).apply()
+    }
+
+    /** Kinds on this checkout the user keeps removing in [app] and could let Parda remove from now on. */
+    @Synchronized
+    fun learningOffers(app: String, kinds: Collection<DarkPatternKind>): List<DarkPatternKind> =
+        removals.offers(app, kinds, _policy.value)
+
+    fun setAutoRemove(app: String, kind: DarkPatternKind, on: Boolean) = setPolicy(_policy.value.autoRemove(app, kind, on))
 
     @Synchronized
     fun record(
@@ -157,6 +177,7 @@ class PardaStore(context: Context) {
         const val KEY_POLICY = "policy"
         const val KEY_ONBOARDED = "onboarded"
         const val KEY_MODEL = "model"
+        const val KEY_REMOVALS = "removals"
 
         /**
          * Measured on an iQOO (SM8850) with ModelBench: Hammer Q4_0 plans best for its speed
