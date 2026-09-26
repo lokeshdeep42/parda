@@ -76,6 +76,8 @@ android {
 
 dependencies {
     implementation(project(":core"))
+    // PDF text extraction, fully offline.
+    implementation(libs.pdfbox.android)
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)

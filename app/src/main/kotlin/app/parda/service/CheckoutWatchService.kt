@@ -52,7 +52,9 @@ class CheckoutWatchService : AccessibilityService() {
 
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
         val pkg = event.packageName?.toString() ?: return
-        if (pkg == packageName || pkg in IGNORED_PACKAGES) return
+        if (pkg in IGNORED_PACKAGES) return
+        // Parda's own screens are never scanned, except the demo store (see DemoCheckoutActivity).
+        if (pkg == packageName && !DemoCheckoutActivity.visible) return
         pending?.let(handler::removeCallbacks)
         pending = Runnable { inspect(pkg) }.also { handler.postDelayed(it, DEBOUNCE_MS) }
     }
@@ -60,6 +62,7 @@ class CheckoutWatchService : AccessibilityService() {
     private fun inspect(pkg: String) {
         val root = rootInActiveWindow ?: return
         if (root.packageName?.toString() != pkg) return
+        if (pkg == packageName && !DemoCheckoutActivity.visible) return
         if (pkg != currentPackage) {
             currentPackage = pkg
             handled.clear()
@@ -171,7 +174,7 @@ class CheckoutWatchService : AccessibilityService() {
         )
     }
 
-    private fun appLabel(pkg: String): String = runCatching {
+    private fun appLabel(pkg: String): String = if (pkg == packageName) "the demo store" else runCatching {
         packageManager.getApplicationLabel(packageManager.getApplicationInfo(pkg, 0)).toString()
     }.getOrDefault(pkg)
 

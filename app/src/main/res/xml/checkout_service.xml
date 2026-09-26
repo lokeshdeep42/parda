@@ -6,4 +6,5 @@
     android:canPerformGestures="false"
     android:canRetrieveWindowContent="true"
     android:description="@string/a11y_description"
-    android:notificationTimeout="300" />
+    android:notificationTimeout="300"
+    android:settingsActivity="app.parda.MainActivity" />

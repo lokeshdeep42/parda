@@ -37,6 +37,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.parda.core.agent.GateDecision
+import app.parda.data.DocumentReader
 import app.parda.data.ModelStatus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -77,6 +78,23 @@ fun AirlockScreen(initialText: String?) {
         }
     }
 
+    var fileNote by remember { mutableStateOf<String?>(null) }
+    val pickFile = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            fileNote = "Reading…"
+            scope.launch {
+                val read = withContext(Dispatchers.IO) { runCatching { DocumentReader.read(context, uri) } }
+                read.onSuccess {
+                    document = it.text
+                    decision = null
+                    fileNote = "${it.name} · read on this phone" + if (it.truncated) " · first 20,000 characters" else ""
+                }.onFailure {
+                    fileNote = (it as? DocumentReader.Unsupported)?.message ?: "Could not read that file."
+                }
+            }
+        }
+    }
+
     ScreenColumn {
         Column {
             Text("Airlock", style = MaterialTheme.typography.headlineLarge)
@@ -86,7 +104,11 @@ fun AirlockScreen(initialText: String?) {
         ModelCard(model, onImport = { pickModel.launch(arrayOf("*/*")) })
 
         GlassCard(padding = 16.dp) {
-            SectionLabel("Inside this phone")
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                SectionLabel("Inside this phone")
+                Pill("Open file", onClick = { pickFile.launch(DocumentReader.MIME_TYPES) })
+            }
+            fileNote?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = Frost.Ink2) }
             OutlinedTextField(
                 value = document,
                 onValueChange = { document = it; decision = null },

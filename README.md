@@ -85,11 +85,14 @@ Code: `core/.../agent/ModelAgent.kt` (prompt + agent, tested with a fake engine)
 ## Try it
 
 1. Install, open Parda, and turn on **Accessibility → Parda checkout shield** from onboarding.
-2. Open any shopping or food-delivery checkout. Pre-ticked protection plans, donations and
+2. **Home → Try a demo checkout** opens a stand-in store with every pattern; the shield scans it
+   like any other app (Parda's own screens are otherwise never scanned). Or open any shopping or
+   food-delivery checkout. Pre-ticked protection plans, donations and
    trials trigger the "Parda paused this checkout" sheet; fees and timers are flagged.
 3. **Airlock** tab: the sample salary letter is loaded. *Summarise* is answered on the device;
    *Am I underpaid?* is handed back sanitized. Paste a reply that uses `<AMOUNT_1>` to see it
-   restored locally.
+   restored locally. **Open file** (or share a file to Parda) reads PDF, Word (.docx), Excel
+   (.xlsx), CSV and text on the device; only the extracted text enters the Airlock.
 4. In any app, select text in a message box → **Mask with Parda**, and the selection is
    replaced with its masked form before you send it.
 5. **Firewall** tab: tap any action pill to cycle it. One policy drives both channels.
