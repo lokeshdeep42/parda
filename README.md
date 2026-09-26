@@ -93,6 +93,11 @@ Code: `core/.../agent/ModelAgent.kt` (prompt + agent, tested with a fake engine)
    *Am I underpaid?* is handed back sanitized. Paste a reply that uses `<AMOUNT_1>` to see it
    restored locally. **Open file** (or share a file to Parda) reads PDF, Word (.docx), Excel
    (.xlsx), CSV and text on the device; only the extracted text enters the Airlock.
+   **Photos and scanned PDFs** (an ID card, a screenshot) are read with ML Kit's bundled on-device
+   OCR; the same detectors and policy decide what to cover (`core/.../image/ImageMasker.kt`), and a
+   flattened PNG with black bars is handed to the share sheet. The original is never modified, and
+   re-encoding drops the photo's metadata. Set Government ID to "Mask all but the last 4" in the
+   Firewall for a UIDAI-style masked Aadhaar.
 4. In any app, select text in a message box → **Mask with Parda**, and the selection is
    replaced with its masked form before you send it.
 5. **Firewall** tab: tap any action pill to cycle it. One policy drives both channels.
@@ -108,8 +113,6 @@ as fallback.
 Next:
 - Measure Hammer2.1-1.5B plan/answer latency on the target phone; tune the prompt if it
   misroutes the demo questions.
-- **Airlock for images.** Mask ID numbers and addresses in photos before sharing, using an
-  on-device OCR model bundled in the APK.
 - Tune the checkout scanner against real apps' accessibility trees, and add app-specific rules
   where row grouping differs.
 - The Manrope typeface from the design is not bundled yet; the system sans is used.

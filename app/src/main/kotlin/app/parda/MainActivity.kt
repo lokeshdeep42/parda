@@ -54,6 +54,7 @@ import app.parda.ui.theme.PardaTheme
 class MainActivity : ComponentActivity() {
     private var tab by mutableIntStateOf(TAB_HOME)
     private var sharedText by mutableStateOf<String?>(null)
+    private var sharedImage by mutableStateOf<Uri?>(null)
 
     /** Bumped on resume so permission state is re-read after a trip to Settings. */
     private var resumeTick by mutableIntStateOf(0)
@@ -84,6 +85,7 @@ class MainActivity : ComponentActivity() {
         @Suppress("DEPRECATION")
         val stream = intent.getParcelableExtra<Uri>(Intent.EXTRA_STREAM)
         when {
+            stream != null && intent.type?.startsWith("image/") == true -> { sharedImage = stream; tab = TAB_AIRLOCK }
             stream != null -> thread(name = "parda-read") {
                 val read = runCatching { DocumentReader.read(this, stream) }
                 runOnUiThread {
@@ -128,7 +130,7 @@ class MainActivity : ComponentActivity() {
                     onTryDemo = { startActivity(Intent(this@MainActivity, DemoCheckoutActivity::class.java)) },
                 )
                 TAB_FIREWALL -> FirewallScreen(policy, store::setPolicy)
-                TAB_AIRLOCK -> AirlockScreen(sharedText)
+                TAB_AIRLOCK -> AirlockScreen(sharedText, sharedImage)
                 TAB_LEDGER -> LedgerScreen(entries, chainIntact, internetDeclared, egress)
             }
             FloatingNav(tab, { tab = it }, Modifier.align(Alignment.BottomCenter))

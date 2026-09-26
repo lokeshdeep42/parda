@@ -13,6 +13,7 @@ class PardaApp : Application() {
     override fun onCreate() {
         super.onCreate()
         store = PardaStore(this)
+        app.parda.data.BuildConfigCompat.debuggable = applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0
         thread(name = "parda-model") { store.loadModel() }
         getSystemService(NotificationManager::class.java).createNotificationChannel(
             NotificationChannel(CHANNEL_INTERCEPTS, getString(R.string.channel_intercepts), NotificationManager.IMPORTANCE_HIGH),

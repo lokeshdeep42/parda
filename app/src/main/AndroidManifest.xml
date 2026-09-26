@@ -52,6 +52,7 @@
                 <data android:mimeType="application/vnd.openxmlformats-officedocument.wordprocessingml.document" />
                 <data android:mimeType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" />
                 <data android:mimeType="text/csv" />
+                <data android:mimeType="image/*" />
             </intent-filter>
         </activity>
 
@@ -83,6 +84,17 @@
             android:exported="false"
             android:label="Demo store"
             android:theme="@android:style/Theme.Material.Light.NoActionBar" />
+
+        <!-- Hands a masked image copy to the share sheet; the original file is never exposed. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.files"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
 
         <service
             android:name=".service.CheckoutWatchService"

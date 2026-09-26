@@ -25,7 +25,10 @@ object DocumentReader {
     /** Enough for any letter, statement or form; keeps the text box and the model responsive. */
     private const val MAX_CHARS = 20_000
 
-    class Unsupported(message: String) : Exception(message)
+    open class Unsupported(message: String) : Exception(message)
+
+    /** The file opened but held no text; for a PDF that means a scan, which OCR can read. */
+    class NoText(message: String, val pdf: Boolean) : Unsupported(message)
 
     data class Result(val name: String, val text: String, val truncated: Boolean)
 
@@ -52,7 +55,7 @@ object DocumentReader {
         }.trim()
 
         if (text.isEmpty()) {
-            throw Unsupported("No text found in $name. If it is a scanned image, it has no text layer to read.")
+            throw NoText("No text found in $name.", pdf = mime == "application/pdf" || ext == "pdf")
         }
         return Result(name, text.take(MAX_CHARS), text.length > MAX_CHARS)
     }

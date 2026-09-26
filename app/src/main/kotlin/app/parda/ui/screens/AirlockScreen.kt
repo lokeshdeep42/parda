@@ -1,5 +1,15 @@
 package app.parda.ui.screens
 
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.semantics.Role
+import androidx.compose.foundation.Image
+import androidx.compose.material3.Checkbox
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import app.parda.data.ImageAirlock
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -60,7 +70,7 @@ import app.parda.ui.theme.Frost
  * can't, Parda prepares a sanitized copy for the user to take elsewhere by their own hand.
  */
 @Composable
-fun AirlockScreen(initialText: String?) {
+fun AirlockScreen(initialText: String?, initialImage: Uri? = null) {
     val context = LocalContext.current
     val store = context.store
     val clipboard = LocalClipboardManager.current
@@ -81,8 +91,34 @@ fun AirlockScreen(initialText: String?) {
     }
 
     var fileNote by remember { mutableStateOf<String?>(null) }
+    var image by remember { mutableStateOf<ImageAirlock.Result?>(null) }
+    var imageName by remember { mutableStateOf("") }
+    fun openImage(uri: Uri, scannedPdf: Boolean = false) {
+        fileNote = "Reading the text in this image, on this phone…"
+        scope.launch {
+            val read = withContext(Dispatchers.IO) {
+                runCatching {
+                    if (scannedPdf) ImageAirlock.readScannedPdf(context, uri, store.policy.value)
+                    else ImageAirlock.read(context, uri, store.policy.value)
+                }
+            }
+            read.onSuccess {
+                image = it
+                imageName = displayName(context, uri) ?: "image"
+                fileNote = null
+            }.onFailure { fileNote = "Could not read that image." }
+        }
+    }
+    LaunchedEffect(initialImage) { initialImage?.let(::openImage) }
+
     val pickFile = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri != null) {
+        if (uri == null) return@rememberLauncherForActivityResult
+        if (context.contentResolver.getType(uri)?.startsWith("image/") == true) {
+            openImage(uri)
+            return@rememberLauncherForActivityResult
+        }
+        image = null
+        run {
             fileNote = "Reading…"
             scope.launch {
                 val read = withContext(Dispatchers.IO) { runCatching { DocumentReader.read(context, uri) } }
@@ -91,7 +127,9 @@ fun AirlockScreen(initialText: String?) {
                     decision = null
                     fileNote = "${it.name} · read on this phone" + if (it.truncated) " · first 20,000 characters" else ""
                 }.onFailure {
-                    fileNote = (it as? DocumentReader.Unsupported)?.message ?: "Could not read that file."
+                    // No text layer: a scanned PDF. Read it with OCR like a photo instead.
+                    if (it is DocumentReader.NoText && it.pdf) openImage(uri, scannedPdf = true)
+                    else fileNote = (it as? DocumentReader.Unsupported)?.message ?: "Could not read that file."
                 }
             }
         }
@@ -105,10 +143,15 @@ fun AirlockScreen(initialText: String?) {
 
         ModelCard(model, onImport = { pickModel.launch(arrayOf("*/*")) })
 
+        image?.let { img ->
+            ImageCard(img, imageName, onClose = { image = null })
+            return@ScreenColumn
+        }
+
         GlassCard(padding = 16.dp) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 SectionLabel("Inside this phone")
-                Pill("Open file", onClick = { pickFile.launch(DocumentReader.MIME_TYPES) })
+                Pill("Open file", onClick = { pickFile.launch(DocumentReader.MIME_TYPES + "image/*") })
             }
             fileNote?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = Frost.Ink2) }
             OutlinedTextField(
@@ -222,6 +265,66 @@ fun AirlockScreen(initialText: String?) {
                 QuietButton("Start over", onClick = { decision = null; reply = "" })
             }
         }
+    }
+}
+
+/**
+ * A picture after OCR: the masked preview, one tick per kind of data found (as in the Frost
+ * design), and the only way out, a flattened copy handed to the share sheet.
+ */
+@Composable
+private fun ImageCard(img: ImageAirlock.Result, name: String, onClose: () -> Unit) {
+    val context = LocalContext.current
+    val store = context.store
+    val plan = img.plan
+    var masked by remember(img) { mutableStateOf(plan.categories.toSet()) }
+    val preview = remember(img, masked) { ImageAirlock.render(img.original, plan.boxes(masked)) }
+
+    GlassCard(padding = 16.dp) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            SectionLabel("Masked copy · original untouched")
+            Pill("Close", onClick = onClose)
+        }
+        Text("$name · read on this phone", style = MaterialTheme.typography.bodyMedium, color = Frost.Ink2)
+        Image(
+            preview.asImageBitmap(), contentDescription = "Masked preview of $name",
+            modifier = Modifier.fillMaxWidth().heightIn(max = 420.dp).clip(RoundedCornerShape(18.dp)),
+            contentScale = ContentScale.Fit,
+        )
+        if (plan.fields.isEmpty()) {
+            Text(
+                "No personal data found in this image. If it is blurry or at an angle, try a straighter photo.",
+                style = MaterialTheme.typography.bodyLarge,
+            )
+        }
+        plan.categories.forEach { c ->
+            val fields = plan.fields.filter { it.category == c }
+            val label = c.label + (if (fields.any { it.keepsLast4 }) " · keep last 4" else "") + " · ${fields.size}"
+            // The whole row is the target, not just the box.
+            Row(
+                Modifier.fillMaxWidth().toggleable(
+                    value = c in masked, role = Role.Checkbox,
+                    onValueChange = { on -> masked = if (on) masked + c else masked - c },
+                ),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Checkbox(checked = c in masked, onCheckedChange = null)
+                Spacer(Modifier.width(8.dp))
+                Text(label, style = MaterialTheme.typography.bodyLarge)
+            }
+        }
+        PrimaryButton("Share masked copy", enabled = plan.fields.isNotEmpty(), onClick = {
+            val uri = ImageAirlock.export(context, preview)
+            val count = plan.fields.count { it.category in masked }
+            store.record(
+                Channel.B, Verdict.HANDED_BACK,
+                "Covered $count field(s) on an image; masked copy handed to you, original untouched",
+                masked = count,
+            )
+            val send = Intent(Intent.ACTION_SEND).setType("image/png").putExtra(Intent.EXTRA_STREAM, uri)
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            context.startActivity(Intent.createChooser(send, "Send masked image"))
+        })
     }
 }
 
