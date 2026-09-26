@@ -24,6 +24,13 @@ class DetectorsTest {
         assertTrue(DataCategory.PHONE to "+91 98490 12345" in found, "$found")
     }
 
+    /** Seen on a phone with an ID card PDF: the name swallowed the next line's "Date". */
+    @Test fun `a name stops at the end of its line`() {
+        val found = categoriesOf("Name: Rajesh Kumar\nDate of birth: 14/08/1990\nMr Anil Reddy\nPhone")
+        assertTrue(DataCategory.PERSON_NAME to "Rajesh Kumar" in found, "$found")
+        assertTrue(DataCategory.PERSON_NAME to "Anil Reddy" in found, "$found")
+    }
+
     @Test fun `detections never overlap`() {
         val found = classifier.classify(Samples.SALARY_LETTER)
         found.zipWithNext().forEach { (a, b) -> assertTrue(a.end <= b.start, "$a overlaps $b") }

@@ -2,7 +2,12 @@ package app.parda.core.checkout
 
 /** Rupee amounts as whole paise, so arithmetic stays exact. */
 object Money {
-    private val AMOUNT = Regex("""(?:₹|\bRs\.?|\bINR)\s?(\d[\d,]*(?:\.\d{1,2})?)""")
+    private val AMOUNT = Regex(
+        """(?:₹|\bRs\.?|\bINR|(?<![\u0900-\u097F])रु\.?|रुपये)\s?(\d[\d,]*(?:\.\d{1,2})?)""" +
+            """|(?<![\d,])(\d[\d,]*(?:\.\d{1,2})?)[ \t]?(?:रुपये|रुपए)""" +
+            // Screen-reader labels spell it out: "price 230 rupees", "Tip 10 rupees".
+            """|(?<![\d,.])(\d[\d,]*(?:\.\d{1,2})?)\s?(?:[Rr]upees?|RUPEES?)\b""",
+    )
     private val RECURRING = Regex(
         """(?:₹|\bRs\.?|\bINR)\s?(\d[\d,]*(?:\.\d{1,2})?)\s*(?:/\s*|per\s+|a\s+|every\s+)(?:mo|month|mth|yr|year|week|wk)\b""",
         RegexOption.IGNORE_CASE,
@@ -20,7 +25,7 @@ object Money {
         val recurringRanges = RECURRING.findAll(text).map { it.range }.toList()
         return AMOUNT.findAll(text)
             .filter { m -> recurringRanges.none { m.range.first in it } }
-            .map { parse(it.groupValues[1]) }
+            .map { m -> parse(m.groupValues.drop(1).first { it.isNotEmpty() }) }
             .toList()
     }
 

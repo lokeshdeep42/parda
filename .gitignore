@@ -8,3 +8,6 @@ captures/
 .cxx/
 *.apk
 *.gguf
+.kotlin/
+bin/
+.vscode/

@@ -1,5 +1,6 @@
 package app.parda.service
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -27,6 +28,10 @@ import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -53,15 +58,44 @@ import app.parda.ui.theme.PardaTheme
  * service then re-reads the screen and unticks only what the user approved.
  */
 class InterceptActivity : ComponentActivity() {
+    /** The checkout on screen. Replaced in [onNewIntent]: this activity is single-instance, so a
+     *  new intercept can arrive while an old sheet is still alive. */
+    private var intercept by mutableStateOf<Intercept?>(null)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val intercept = InterceptState.current.value ?: run { finish(); return }
+        intercept = InterceptState.current.value ?: run { finish(); return }
         setContent {
+            val current = intercept ?: return@setContent
             PardaTheme {
-                BackHandler { keep(intercept) }
-                Sheet(intercept, onRemove = { remove(intercept, it) }, onKeep = { keep(intercept) })
+                key(current) {
+                    BackHandler { keep(current) }
+                    Sheet(current, onRemove = { remove(current, it) }, onKeep = { keep(current) })
+                }
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        InterceptState.current.value?.let { intercept = it }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        onScreen = true
+    }
+
+    override fun onPause() {
+        onScreen = false
+        super.onPause()
+    }
+
+    companion object {
+        /** While the sheet is up the user is deciding: the shield reads nothing, least of all the sheet. */
+        @Volatile
+        var onScreen = false
+            private set
     }
 
     private fun remove(intercept: Intercept, approved: List<Finding>) {

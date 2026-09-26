@@ -9,7 +9,8 @@ import app.parda.core.detect.Classifier
 class RuleBasedAgent(private val classifier: Classifier = Classifier()) : LocalAgent {
 
     override fun plan(request: String, document: String): AgentPlan {
-        val r = request.lowercase()
+        // NFC, so a nukta typed either way ("ज़" as one or two code points) matches the keywords.
+        val r = java.text.Normalizer.normalize(request.lowercase(), java.text.Normalizer.Form.NFC)
         if (OUTSIDE.any { it in r }) return AgentPlan.HandBack(HandBackReason.NEEDS_OUTSIDE_KNOWLEDGE)
         return when {
             SUMMARISE.any { it in r } -> AgentPlan.AnswerLocally(LocalTask.SUMMARISE)
@@ -18,7 +19,7 @@ class RuleBasedAgent(private val classifier: Classifier = Classifier()) : LocalA
         }
     }
 
-    override fun answer(task: LocalTask, request: String, document: String): String? = when (task) {
+    override fun answer(task: LocalTask, request: String, document: String, onToken: (String) -> Unit): String? = when (task) {
         LocalTask.SUMMARISE -> summarise(document)
         LocalTask.EXTRACT -> extract(document)
         LocalTask.REWRITE -> null
@@ -38,17 +39,24 @@ class RuleBasedAgent(private val classifier: Classifier = Classifier()) : LocalA
     private fun extract(document: String): String {
         val found = classifier.classify(document)
         if (found.isEmpty()) return "No names, numbers or amounts found."
-        return found.joinToString("\n") { "${it.detector}: ${it.value}" }
+        val counts = found.groupingBy { it.category.label }.eachCount().entries.sortedByDescending { it.value }
+        val head = "${found.size} item(s): " + counts.joinToString(" · ") { (k, n) -> "$n ${k.lowercase()}" }
+        val shown = found.take(MAX_LISTED).joinToString("\n") { "${it.detector}: ${it.value}" }
+        val more = if (found.size > MAX_LISTED) "\n…and ${found.size - MAX_LISTED} more, all found on this phone." else ""
+        return "$head\n\n$shown$more"
     }
 
     private companion object {
+        const val MAX_LISTED = 40
         val OUTSIDE = listOf(
             "compare", "typical", "market", "benchmark", "average", "industry", "latest", "current rate",
             "news", "underpaid", "overpaid", "is this fair", "should i", "research", "search", "look up",
-            "legal advice", "what is the law",
-        )
-        val SUMMARISE = listOf("summar", "tl;dr", "tldr", "key terms", "key points", "gist", "in short", "main points")
-        val EXTRACT = listOf("extract", "list the", "pull out", "what are the numbers", "find the", "which amounts")
+            "legal", " law", "tax rule", "regulation",
+            // Hindi: market, compare, law, average, online, typical households
+            "बाज़ार", "बाजार", "तुलना", "कानून", "क़ानून", "औसत", "ऑनलाइन", "आम परिवार",
+        ).map { java.text.Normalizer.normalize(it, java.text.Normalizer.Form.NFC) }
+        val SUMMARISE = listOf("summar", "tl;dr", "tldr", "key terms", "key points", "gist", "in short", "main points", "सारांश")
+        val EXTRACT = listOf("extract", "list the", "pull out", "what are the numbers", "find the", "which amounts", "सूची", "निकाल")
         val SKIP_PREFIXES = listOf("subject:", "dear ", "regards", "thanks", "thank you", "sincerely")
     }
 }

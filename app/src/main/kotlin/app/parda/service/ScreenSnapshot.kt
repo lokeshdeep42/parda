@@ -33,6 +33,13 @@ object ScreenSnapshot {
     @Suppress("DEPRECATION")
     val AccessibilityNodeInfo.isCheckedCompat: Boolean get() = isChecked
 
+    /** Indented outline of a snapshot: id, checkbox state and label. For debug logs only. */
+    fun dump(node: ScreenNode, depth: Int = 0): String = buildString {
+        val box = if (node.checkable) (if (node.checked) "[x] " else "[ ] ") else ""
+        if (node.label.isNotBlank() || node.checkable) append("  ".repeat(depth)).append(node.id).append(' ').append(box).append(node.label).append('\n')
+        node.children.forEach { append(dump(it, depth + 1)) }
+    }
+
     fun resolve(root: AccessibilityNodeInfo, id: String): AccessibilityNodeInfo? =
         id.split('.').drop(1).fold(root as AccessibilityNodeInfo?) { node, i -> node?.getChild(i.toInt()) }
 }

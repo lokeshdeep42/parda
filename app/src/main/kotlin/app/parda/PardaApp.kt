@@ -4,6 +4,7 @@ import android.app.Application
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import app.parda.data.PardaStore
+import kotlin.concurrent.thread
 
 class PardaApp : Application() {
     lateinit var store: PardaStore
@@ -12,6 +13,8 @@ class PardaApp : Application() {
     override fun onCreate() {
         super.onCreate()
         store = PardaStore(this)
+        app.parda.data.BuildConfigCompat.debuggable = applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0
+        thread(name = "parda-model") { store.loadModel() }
         getSystemService(NotificationManager::class.java).createNotificationChannel(
             NotificationChannel(CHANNEL_INTERCEPTS, getString(R.string.channel_intercepts), NotificationManager.IMPORTANCE_HIGH),
         )

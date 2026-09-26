@@ -45,6 +45,7 @@ fun HomeScreen(
     entries: List<LedgerEntry>,
     onEnableService: () -> Unit,
     onOpenLedger: () -> Unit,
+    onTryDemo: () -> Unit,
 ) {
     ScreenColumn {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -63,6 +64,7 @@ fun HomeScreen(
                         Spacer(Modifier.width(12.dp)); Dot(Frost.OkDot, 8.dp)
                         Text("  Active · on-device", style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 7.dp, bottom = 7.dp, end = 12.dp))
                     }
+                    Pill("Try a demo checkout", strong = true, onClick = onTryDemo)
                 } else {
                     Pill("Shield is off — turn on", strong = true, onClick = onEnableService)
                 }

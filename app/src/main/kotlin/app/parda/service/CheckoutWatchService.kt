@@ -5,7 +5,9 @@ import android.accessibilityservice.AccessibilityService
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
+import android.util.Log
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
@@ -19,8 +21,10 @@ import app.parda.PardaApp
 import app.parda.R
 import app.parda.core.checkout.CheckoutGate
 import app.parda.core.checkout.CheckoutScan
+import app.parda.core.checkout.DarkPatternScanner
 import app.parda.core.checkout.Finding
 import app.parda.core.checkout.Money
+import app.parda.core.checkout.ScreenNode
 import app.parda.core.ledger.Channel
 import app.parda.core.ledger.Verdict
 import app.parda.store
@@ -34,10 +38,7 @@ import app.parda.store
 class CheckoutWatchService : AccessibilityService() {
     private val handler = Handler(Looper.getMainLooper())
     private var pending: Runnable? = null
-    private var currentPackage: String? = null
 
-    /** Findings already acted on for the current checkout, so one screen is not reported twice. */
-    private val handled = HashSet<String>()
 
     override fun onServiceConnected() {
         instance = this
@@ -52,27 +53,43 @@ class CheckoutWatchService : AccessibilityService() {
 
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
         val pkg = event.packageName?.toString() ?: return
-        if (pkg == packageName || pkg in IGNORED_PACKAGES) return
+        if (pkg in IGNORED_PACKAGES) return
+        // Parda's own screens are never scanned, except the demo store (see DemoCheckoutActivity).
+        if (pkg == packageName && !DemoCheckoutActivity.visible) return
         pending?.let(handler::removeCallbacks)
         pending = Runnable { inspect(pkg) }.also { handler.postDelayed(it, DEBOUNCE_MS) }
     }
 
     private fun inspect(pkg: String) {
+        if (InterceptActivity.onScreen) return
         val root = rootInActiveWindow ?: return
         if (root.packageName?.toString() != pkg) return
-        if (pkg != currentPackage) {
-            currentPackage = pkg
-            handled.clear()
-        }
+        if (pkg == packageName && !DemoCheckoutActivity.visible) return
 
-        val scan = store.scanner.scan(ScreenSnapshot.capture(root))
+        val snapshot = ScreenSnapshot.capture(root)
+        val scan = store.scanner.scan(snapshot)
+        if (debuggable && scan.isCheckout) {
+            // Debug builds only: what the shield read and concluded, for tuning against real apps.
+            Log.i(TAG, "checkout in $pkg\n" + ScreenSnapshot.dump(snapshot))
+            scan.findings.forEach { Log.i(TAG, "finding ${it.kind} fixable=${it.fixable} cost=${it.cost}: ${it.evidence}") }
+        }
+        val now = System.currentTimeMillis()
+        val seen = handled.getOrPut(pkg) { HashSet() }
+        val unticked = seenUnticked.getOrPut(pkg) { HashSet() }
         if (!scan.isCheckout) {
-            handled.clear()
+            // A half-drawn screen during a transition can look like "not a checkout". Only
+            // forget what was handled once the user has really been away for a while.
+            if (now - (lastCheckoutAt[pkg] ?: 0L) > FORGET_AFTER_MS) { seen.clear(); unticked.clear() }
             return
         }
-        val fresh = scan.findings.filter { it.key !in handled }
+        lastCheckoutAt[pkg] = now
+        // A box seen empty on this checkout and ticked later was ticked by the user: their choice.
+        val chosen = unticked.toSet()
+        fun collect(n: ScreenNode) { if (n.checkable && !n.checked) unticked += n.label.trim(); n.children.forEach(::collect) }
+        collect(snapshot)
+        val fresh = scan.findings.filter { it.key !in seen && !(it.nodeId != null && it.evidence in chosen) }
         if (fresh.isEmpty()) return
-        handled += fresh.map { it.key }
+        seen += fresh.map { it.key }
 
         val plan = CheckoutGate.plan(CheckoutScan(true, fresh), store.policy.value)
         val app = appLabel(pkg)
@@ -114,7 +131,10 @@ class CheckoutWatchService : AccessibilityService() {
             val id = f.nodeId ?: return@filter false
             if (!CheckoutGate.mayUntick(id, scan)) return@filter false
             val node = ScreenSnapshot.resolve(root, id) ?: return@filter false
-            if (!node.isCheckable || !with(ScreenSnapshot) { node.isCheckedCompat }) return@filter false
+            // Either a ticked box, or the "Remove" link beside an extra that has no box.
+            val ok = if (node.isCheckable) with(ScreenSnapshot) { node.isCheckedCompat }
+            else DarkPatternScanner.isRemoveControl((node.text ?: node.contentDescription ?: "").toString())
+            if (!ok) return@filter false
             clickable(node)?.performAction(AccessibilityNodeInfo.ACTION_CLICK) == true
         }
 
@@ -171,12 +191,28 @@ class CheckoutWatchService : AccessibilityService() {
         )
     }
 
-    private fun appLabel(pkg: String): String = runCatching {
+    private fun appLabel(pkg: String): String = if (pkg == packageName) "the demo store" else runCatching {
         packageManager.getApplicationLabel(packageManager.getApplicationInfo(pkg, 0)).toString()
     }.getOrDefault(pkg)
 
+    private val debuggable by lazy { applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0 }
+
     companion object {
+        private const val TAG = "PardaShield"
         private const val DEBOUNCE_MS = 600L
+        private const val FORGET_AFTER_MS = 10_000L
+
+        /**
+         * Findings already acted on, per app, so one checkout is not reported twice. Per app
+         * because the active window flickers between apps while sheets open and close; held
+         * here, not on the instance, because some OEMs (iQOO) rebind the service every few
+         * seconds and each rebind is a fresh object.
+         */
+        private val handled = HashMap<String, MutableSet<String>>()
+        private val lastCheckoutAt = HashMap<String, Long>()
+
+        /** Labels of boxes seen unticked on the current checkout, per app. */
+        private val seenUnticked = HashMap<String, MutableSet<String>>()
         private const val AFTER_SHEET_MS = 450L
         private const val NOTIFICATION_ID = 1
 
@@ -186,6 +222,13 @@ class CheckoutWatchService : AccessibilityService() {
         @Volatile
         var instance: CheckoutWatchService? = null
             private set
+
+        /** Forgets what was handled in [pkg], so the next checkout there is reported afresh. */
+        fun forget(pkg: String) {
+            handled.remove(pkg)
+            lastCheckoutAt.remove(pkg)
+            seenUnticked.remove(pkg)
+        }
 
         fun isEnabled(context: Context): Boolean {
             val enabled = android.provider.Settings.Secure.getString(

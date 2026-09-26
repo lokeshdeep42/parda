@@ -46,7 +46,8 @@ object AddressDetector : Detector {
     override val category = DataCategory.ADDRESS
     override val name = "Address"
     private val pin = Regex("""(?<!\d)[1-9]\d{2}\s?\d{3}(?!\d)""")
-    private val label = Regex("""^\s*[A-Za-z][A-Za-z ]{0,30}:\s*""")
+    // OCR often reads a colon after Devanagari as the visarga (ः), which looks the same.
+    private val label = Regex("""^\s*[A-Za-z\u0900-\u097F][A-Za-z\u0900-\u097F ]{0,30}[:\u0903]\s*""")
 
     override fun find(text: String): List<Detection> {
         val out = mutableListOf<Detection>()
@@ -152,35 +153,110 @@ object Detectors {
         DataCategory.MONEY_AMOUNT, "Amount",
         Regex(
             """(?:₹|\bRs\.?|\bINR)\s?\d[\d,]*(?:\.\d{1,2})?(?:\s?(?:lakhs?|crores?|cr|L|k)\b)?""" +
-                """|\b\d+(?:\.\d+)?\s?(?:LPA|lakhs?|crores?)\b""",
+                // Not a lab value: "2.1 lakh/cumm" is a platelet count, not money.
+                """|\b\d+(?:\.\d+)?\s?(?:LPA|lakhs?|crores?)\b(?!\s*/)""" +
+                // Hindi: "रु. 24,000", "18,40,000 रुपये", "18 लाख"
+                """|(?<![\u0900-\u097F])(?:रु\.?|रुपये)[ \t]?\d[\d,]*(?:\.\d{1,2})?""" +
+                """|(?<![\d,])\d[\d,]*(?:\.\d{1,2})?[ \t]?(?:रुपये|रुपए|लाख|करोड़)""",
         ),
     )
     private const val CAP = """[A-Z][a-z]+"""
+    // Name parts are joined by spaces or tabs only: a name never continues onto the next line.
+    private const val NAME = """(?:[A-Z]\.[ \t]?)*$CAP(?:[ \t]+$CAP){0,2}"""
     val NAME_HONORIFIC = RegexDetector(
         DataCategory.PERSON_NAME, "Name",
-        Regex("""\b(?:Mr|Ms|Mrs|Dr|Shri|Smt|Kumari)\.?\s+(?<v>(?:[A-Z]\.\s?)*$CAP(?:\s+$CAP){0,2})\b"""),
+        Regex("""\b(?:Mr|Ms|Mrs|Dr|Shri|Smt|Kumari)\.?[ \t]+(?<v>$NAME)\b"""),
     )
     val NAME_LABELLED = RegexDetector(
         DataCategory.PERSON_NAME, "Name",
-        Regex("""(?:\b(?:[Nn]ame|NAME)\s*[:\-]\s*|\bDear\s+)(?<v>(?:[A-Z]\.\s?)*$CAP(?:\s+$CAP){0,2})\b"""),
-        accept = { it !in setOf("Sir", "Madam", "Customer", "Team", "User", "Friend", "All") },
+        Regex("""(?:\b(?:[Nn]ame|NAME)[ \t]*[:\-][ \t]*|\bDear[ \t]+)(?<v>$NAME)\b"""),
+        // "Patient Name : Mrs. Lakshmi" -> the title is not the name; NAME_HONORIFIC takes the name.
+        accept = { it !in setOf("Sir", "Madam", "Customer", "Team", "User", "Friend", "All", "Mr", "Mrs", "Ms", "Dr", "Shri", "Smt") },
+    )
+
+    /** ABHA (Ayushman Bharat Health Account) number: 14 digits, printed 2-4-4-4. */
+    val ABHA_NUMBER = RegexDetector(
+        DataCategory.GOV_ID, "ABHA number",
+        Regex("""(?<![\d-])\d{2}[ -]\d{4}[ -]\d{4}[ -]\d{4}(?![\d-])"""),
+    )
+
+    /** ABHA address, the health ID's handle: "lakshmi.n@abdm". */
+    val ABHA_ADDRESS = RegexDetector(
+        DataCategory.HEALTH_ID, "ABHA address",
+        Regex("""(?i)\b[\w.]+@(?:abdm|sbx)\b"""),
+    )
+
+    /** Hospital and lab record numbers, found by their label; the value must contain a digit. */
+    val RECORD_ID = RegexDetector(
+        DataCategory.HEALTH_ID, "Health record ID",
+        Regex(
+            """(?i)\b(?:UHID|MRN|MR\s?No|CR\s?No|Patient\s?ID|Lab\s?(?:No|ID)|Sample\s?(?:No|ID)|Reg(?:istration)?\.?\s?No|IP\s?No|OP\s?No""" +
+                """|Accession\s?No|Visit\s?(?:No|ID))\.?[ \t]*[:#\-]?[ \t]*(?<v>(?=[A-Z0-9/\-]*\d)[A-Z0-9][A-Z0-9/\-]{3,})""",
+        ),
+    )
+
+    // Devanagari: letters and vowel signs, without the danda (।) or Devanagari digits. A Hindi
+    // name runs at most three words and stops at a postposition ("राजेश कुमार को" -> "राजेश कुमार").
+    private const val DEVA = """[\u0900-\u0963\u0971-\u097F]+"""
+    private const val NOT_POSTPOSITION = """(?!(?:को|का|की|के|ने|से|में|पर|और|है|जी)(?![\u0900-\u097F]))"""
+    private const val NAME_HI = """$DEVA(?:[ \t]+$NOT_POSTPOSITION$DEVA){0,2}"""
+    val NAME_HONORIFIC_HI = RegexDetector(
+        DataCategory.PERSON_NAME, "Name",
+        Regex("""(?<![\u0900-\u097F])(?:श्रीमती|श्री|सुश्री|कुमारी|डॉ\.?)[ \t]+(?<v>$NAME_HI)"""),
+    )
+    val NAME_LABELLED_HI = RegexDetector(
+        DataCategory.PERSON_NAME, "Name",
+        Regex("""(?:(?<![\u0900-\u097F])नाम[ \t]*[:\u0903\-][ \t]*|(?<![\u0900-\u097F])प्रिय[ \t]+(?!श्री|सुश्री|कुमारी|डॉ))(?<v>$NAME_HI|$NAME)"""),
+    )
+    val DOB_HI = RegexDetector(
+        DataCategory.DATE_OF_BIRTH, "Date of birth",
+        Regex("""(?:जन्म[ \t]*(?:तिथि|तारीख)|जन्मतिथि)[ \t]*[:\u0903\-]?[ \t]*(?<v>\d{1,2}[/.\- ]\d{1,2}[/.\- ]\d{2,4})"""),
     )
 
     val DEFAULT: List<Detector> = listOf(
-        EMAIL, AADHAAR, MASKED_AADHAAR, PAN, CARD, AddressDetector, PHONE, BANK_ACCOUNT,
-        DOB, MONEY, NAME_HONORIFIC, NAME_LABELLED,
+        ABHA_ADDRESS, EMAIL, AADHAAR, MASKED_AADHAAR, PAN, ABHA_NUMBER, CARD, AddressDetector, PHONE, RECORD_ID, BANK_ACCOUNT,
+        DOB, DOB_HI, MONEY, NAME_HONORIFIC, NAME_LABELLED, NAME_HONORIFIC_HI, NAME_LABELLED_HI,
     )
 }
 
 /** Runs every detector and resolves overlaps into a clean, ordered list of spans. */
 class Classifier(private val detectors: List<Detector> = Detectors.DEFAULT) {
+    /**
+     * A whole 600-page file is split at line breaks and classified on every core. No detector
+     * matches across a line break, so splitting there changes nothing but the time taken.
+     */
     fun classify(text: String): List<Detection> {
+        if (text.length < PARALLEL_FROM) return classifyPart(text)
+        val parts = mutableListOf<IntRange>()
+        var start = 0
+        while (start < text.length) {
+            val cut = text.indexOf('\n', minOf(start + PART, text.length)).let { if (it < 0) text.length else it + 1 }
+            parts += start until cut
+            start = cut
+        }
+        return parts.parallelStream()
+            .map { r -> classifyPart(text.substring(r.first, r.last + 1)).map { it.copy(start = it.start + r.first, end = it.end + r.first) } }
+            .collect(java.util.stream.Collectors.toList())
+            .flatten()
+    }
+
+    private fun classifyPart(text: String): List<Detection> {
         val candidates = detectors.flatMapIndexed { rank, d -> d.find(text).map { rank to it } }
             .sortedWith(compareBy<Pair<Int, Detection>> { it.first }.thenByDescending { it.second.end - it.second.start })
-        val taken = mutableListOf<Detection>()
+        // Taken spans never overlap, so a candidate can only collide with its nearest neighbour
+        // on either side: a sorted map keeps this O(n log n) for a whole 600-page file.
+        val taken = java.util.TreeMap<Int, Detection>()
         for ((_, c) in candidates) {
-            if (taken.none { c.start < it.end && c.end > it.start }) taken += c
+            val before = taken.floorEntry(c.start)?.value
+            val after = taken.ceilingEntry(c.start)?.value
+            if ((before == null || before.end <= c.start) && (after == null || after.start >= c.end)) taken[c.start] = c
         }
-        return taken.sortedBy { it.start }
+        return taken.values.toList()
+    }
+
+    private companion object {
+        /** Below this, one core is quicker than splitting. */
+        const val PARALLEL_FROM = 100_000
+        const val PART = 50_000
     }
 }

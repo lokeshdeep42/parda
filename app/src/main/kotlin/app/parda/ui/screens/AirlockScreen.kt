@@ -1,7 +1,31 @@
 package app.parda.ui.screens
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.foundation.horizontalScroll
+import app.parda.core.document.SuggestedQuestions
+import app.parda.core.agent.Planner
+import kotlinx.coroutines.Job
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.semantics.Role
+import androidx.compose.foundation.Image
+import androidx.compose.material3.Checkbox
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import app.parda.data.ImageAirlock
+import android.content.Context
 import android.content.Intent
+import android.net.Uri
+import android.provider.OpenableColumns
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -18,6 +42,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -29,7 +54,13 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.parda.core.agent.GateDecision
+import app.parda.data.DocumentReader
+import app.parda.data.ModelStatus
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import app.parda.core.ledger.Channel
 import app.parda.core.ledger.Verdict
 import app.parda.store
@@ -46,7 +77,7 @@ import app.parda.ui.theme.Frost
  * can't, Parda prepares a sanitized copy for the user to take elsewhere by their own hand.
  */
 @Composable
-fun AirlockScreen(initialText: String?) {
+fun AirlockScreen(initialText: String?, initialImage: Uri? = null) {
     val context = LocalContext.current
     val store = context.store
     val clipboard = LocalClipboardManager.current
@@ -55,6 +86,83 @@ fun AirlockScreen(initialText: String?) {
     var request by rememberSaveable { mutableStateOf("") }
     var reply by rememberSaveable { mutableStateOf("") }
     var decision by remember { mutableStateOf<GateDecision?>(null) }
+    var thinking by remember { mutableStateOf(false) }
+    val model by store.model.collectAsStateWithLifecycle()
+    val scope = rememberCoroutineScope()
+
+    val pickModel = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            val name = displayName(context, uri) ?: "model.gguf"
+            scope.launch(Dispatchers.IO) { store.importModel(uri, name) }
+        }
+    }
+
+    var fileNote by remember { mutableStateOf<String?>(null) }
+    // The file behind the text box: summaries use all of it, the box shows the first 20,000 characters.
+    var preview by remember { mutableStateOf<String?>(null) }
+    var fullText by remember { mutableStateOf<String?>(null) }
+    var pages by remember { mutableStateOf<Int?>(null) }
+    var fullRead by remember { mutableStateOf<Job?>(null) }
+    var streamed by remember { mutableStateOf("") }
+    var image by remember { mutableStateOf<ImageAirlock.Result?>(null) }
+    var imageName by remember { mutableStateOf("") }
+    fun openImage(uri: Uri, scannedPdf: Boolean = false) {
+        fileNote = "Reading the text in this image, on this phone…"
+        scope.launch {
+            val read = withContext(Dispatchers.IO) {
+                runCatching {
+                    if (scannedPdf) ImageAirlock.readScannedPdf(context, uri, store.policy.value)
+                    else ImageAirlock.read(context, uri, store.policy.value)
+                }
+            }
+            read.onSuccess {
+                image = it
+                imageName = displayName(context, uri) ?: "image"
+                fileNote = null
+            }.onFailure {
+                android.util.Log.w("PardaOCR", "could not read image", it)
+                fileNote = "Could not read that image."
+            }
+        }
+    }
+    LaunchedEffect(initialImage) { initialImage?.let(::openImage) }
+
+    val pickFile = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        if (context.contentResolver.getType(uri)?.startsWith("image/") == true) {
+            openImage(uri)
+            return@rememberLauncherForActivityResult
+        }
+        image = null
+        run {
+            fileNote = "Reading…"
+            scope.launch {
+                val read = withContext(Dispatchers.IO) { runCatching { DocumentReader.read(context, uri) } }
+                read.onSuccess { r ->
+                    document = r.text
+                    preview = r.text
+                    fullText = r.full
+                    pages = r.pages
+                    decision = null
+                    fileNote = fileNote(r)
+                    if (!r.complete) {
+                        // A long PDF: show the preview now, read the rest for the summary meanwhile.
+                        fullRead = scope.launch {
+                            val whole = withContext(Dispatchers.IO) { runCatching { DocumentReader.read(context, uri, whole = true) }.getOrNull() }
+                            if (whole != null) {
+                                fullText = whole.full
+                                fileNote = fileNote(whole)
+                            }
+                        }
+                    }
+                }.onFailure {
+                    // No text layer: a scanned PDF. Read it with OCR like a photo instead.
+                    if (it is DocumentReader.NoText && it.pdf) openImage(uri, scannedPdf = true)
+                    else fileNote = (it as? DocumentReader.Unsupported)?.message ?: "Could not read that file."
+                }
+            }
+        }
+    }
 
     ScreenColumn {
         Column {
@@ -62,12 +170,30 @@ fun AirlockScreen(initialText: String?) {
             Text("Mask it before you share it", style = MaterialTheme.typography.bodyLarge, color = Frost.Ink2)
         }
 
+        val installed = remember(model) { store.installedModels().map { it.nameWithoutExtension to it.length() } }
+        ModelCard(
+            model, installed,
+            onImport = { pickModel.launch(arrayOf("*/*")) },
+            onPick = { name -> scope.launch(Dispatchers.IO) { store.useModel(name) } },
+        )
+
+        image?.let { img ->
+            ImageCard(img, imageName, onClose = { image = null })
+            return@ScreenColumn
+        }
+
         GlassCard(padding = 16.dp) {
-            SectionLabel("Inside this phone")
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                SectionLabel("Inside this phone")
+                Pill("Open file", onClick = { pickFile.launch(DocumentReader.MIME_TYPES + "image/*") })
+            }
+            fileNote?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = Frost.Ink2) }
             OutlinedTextField(
                 value = document,
                 onValueChange = { document = it; decision = null },
-                modifier = Modifier.fillMaxWidth().heightIn(min = 160.dp),
+                // Capped so a long document scrolls inside the box instead of pushing the
+                // question and the Ask button off the bottom of the screen.
+                modifier = Modifier.fillMaxWidth().heightIn(min = 160.dp, max = 320.dp),
                 textStyle = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
                 label = { Text("Text you are about to send") },
                 colors = fieldColors(),
@@ -77,36 +203,63 @@ fun AirlockScreen(initialText: String?) {
                 onValueChange = { request = it; decision = null },
                 modifier = Modifier.fillMaxWidth(),
                 label = { Text("What do you want to know?") },
-                placeholder = { Text("Summarise the key terms") },
+                placeholder = { Text("Ask about this document, or tap a suggestion") },
                 colors = fieldColors(),
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Pill("Summarise", onClick = { request = EASY; decision = null })
-                Pill("Am I underpaid?", onClick = { request = HARD; decision = null })
+            // Questions that fit whatever is loaded: a statement, a lease, a payroll export, an ID.
+            val suggestions = remember(document) { SuggestedQuestions.of(document) }
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                suggestions.forEach { q -> Pill(q.label, strong = request == q.request, onClick = { request = q.request; decision = null }) }
             }
-            PrimaryButton("Ask the agent", enabled = document.isNotBlank(), onClick = {
-                val d = store.gate.handle(document, request.ifBlank { EASY }, store.policy.value)
-                decision = d
-                when (d) {
-                    is GateDecision.HeldLocally -> store.record(
-                        Channel.B, Verdict.HELD_LOCALLY,
-                        "${d.result.detections.size} sensitive item(s) classified; answered on the device, nothing prepared to send",
-                    )
-                    is GateDecision.HandedBack -> store.record(
-                        Channel.B, Verdict.HANDED_BACK,
-                        "${d.result.vault.withheld} item(s) withheld (${d.result.blockedCount} blocked); sanitized copy prepared, nothing transmitted",
-                        masked = d.result.vault.withheld,
-                    )
-                }
-            })
+            PrimaryButton(
+                if (thinking) "Thinking on this phone…" else "Ask the agent",
+                enabled = document.isNotBlank() && !thinking,
+                onClick = {
+                    thinking = true
+                    streamed = ""
+                    scope.launch {
+                        fullRead?.join()
+                        // If the text box was edited, it is the document; otherwise the whole file is.
+                        val fromFile = preview != null && document == preview
+                        val whole = if (fromFile) fullText ?: document else document
+                        val d = withContext(Dispatchers.Default) {
+                            store.gate.handle(
+                                document, request.ifBlank { SuggestedQuestions.of(document).firstOrNull()?.request ?: EASY }, store.policy.value,
+                                full = whole, pages = if (fromFile) pages else null,
+                            ) { piece -> scope.launch(Dispatchers.Main) { streamed += piece } }
+                        }
+                        val planner = d.plannedBy.label +
+                            if (d.plannedBy == Planner.MODEL) " (${(model as? ModelStatus.Ready)?.name ?: "model"})" else ""
+                        decision = d
+                        thinking = false
+                        when (d) {
+                            is GateDecision.HeldLocally -> store.record(
+                                Channel.B, Verdict.HELD_LOCALLY,
+                                "${d.result.detections.size} sensitive item(s) classified; answered on the device by $planner, nothing prepared to send",
+                            )
+                            is GateDecision.HandedBack -> store.record(
+                                Channel.B, Verdict.HANDED_BACK,
+                                "${d.result.vault.withheld} item(s) withheld (${d.result.blockedCount} blocked); planned by $planner; sanitized copy prepared, nothing transmitted",
+                                masked = d.result.vault.withheld,
+                            )
+                        }
+                    }
+                },
+            )
         }
 
         when (val d = decision) {
-            null -> Unit
+            null -> if (thinking && streamed.isNotBlank()) {
+                GlassCard(padding = 16.dp) {
+                    SectionLabel("Writing on this phone…")
+                    Text(streamed, style = MaterialTheme.typography.bodyLarge)
+                }
+            }
             is GateDecision.HeldLocally -> {
                 NightCard {
                     SectionLabel("Answered on this phone", Frost.NightInk2)
                     Text("Nothing needed to leave — not even a surrogate.", color = Color.White, style = MaterialTheme.typography.bodyLarge)
+                    Text("Planned by ${d.plannedBy.label}", color = Frost.NightInk2, style = MaterialTheme.typography.bodyMedium)
                 }
                 GlassCard(padding = 16.dp) {
                     SectionLabel("Answer")
@@ -123,6 +276,9 @@ fun AirlockScreen(initialText: String?) {
                 }
                 GlassCard(padding = 16.dp) {
                     SectionLabel("What you can take outside · ${d.result.vault.withheld} withheld")
+                    if (preview != null && document == preview && (fullText?.length ?: 0) > document.length) {
+                        Text("This copy is the text box: the first 20,000 characters of the file.", style = MaterialTheme.typography.bodyMedium, color = Frost.Ink2)
+                    }
                     Mono(d.outbound)
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
                         Pill("Copy", strong = true, onClick = { clipboard.setText(AnnotatedString(d.outbound)) })
@@ -134,11 +290,15 @@ fun AirlockScreen(initialText: String?) {
                 }
                 GlassCard(padding = 16.dp) {
                     SectionLabel("Vault — never leaves this phone")
-                    d.result.vault.entries.forEach { e ->
+                    val entries = d.result.vault.entries
+                    entries.take(VAULT_ROWS).forEach { e ->
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                             Text(e.token, fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.bodyMedium)
                             Text(e.real, style = MaterialTheme.typography.bodyMedium, color = Frost.WarnInk)
                         }
+                    }
+                    if (entries.size > VAULT_ROWS) {
+                        Text("and ${entries.size - VAULT_ROWS} more, all held on this phone", style = MaterialTheme.typography.bodyMedium, color = Frost.Ink2)
                     }
                 }
                 GlassCard(padding = 16.dp) {
@@ -161,12 +321,129 @@ fun AirlockScreen(initialText: String?) {
     }
 }
 
+/**
+ * A picture after OCR: the masked preview, one tick per kind of data found (as in the Frost
+ * design), and the only way out, a flattened copy handed to the share sheet.
+ */
+@Composable
+private fun ImageCard(img: ImageAirlock.Result, name: String, onClose: () -> Unit) {
+    val context = LocalContext.current
+    val store = context.store
+    val plan = img.plan
+    var masked by remember(img) { mutableStateOf(plan.categories.toSet()) }
+    val preview = remember(img, masked) { ImageAirlock.render(img.original, plan.boxes(masked)) }
+
+    GlassCard(padding = 16.dp) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            SectionLabel("Masked copy · original untouched")
+            Pill("Close", onClick = onClose)
+        }
+        Text("$name · read on this phone", style = MaterialTheme.typography.bodyMedium, color = Frost.Ink2)
+        Image(
+            preview.asImageBitmap(), contentDescription = "Masked preview of $name",
+            modifier = Modifier.fillMaxWidth().heightIn(max = 420.dp).clip(RoundedCornerShape(18.dp)),
+            contentScale = ContentScale.Fit,
+        )
+        if (plan.fields.isEmpty()) {
+            Text(
+                "No personal data found in this image. If it is blurry or at an angle, try a straighter photo.",
+                style = MaterialTheme.typography.bodyLarge,
+            )
+        }
+        plan.categories.forEach { c ->
+            val fields = plan.fields.filter { it.category == c }
+            val label = c.label + (if (fields.any { it.keepsLast4 }) " · keep last 4" else "") + " · ${fields.size}"
+            // The whole row is the target, not just the box.
+            Row(
+                Modifier.fillMaxWidth().toggleable(
+                    value = c in masked, role = Role.Checkbox,
+                    onValueChange = { on -> masked = if (on) masked + c else masked - c },
+                ),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Checkbox(checked = c in masked, onCheckedChange = null)
+                Spacer(Modifier.width(8.dp))
+                Text(label, style = MaterialTheme.typography.bodyLarge)
+            }
+        }
+        PrimaryButton("Share masked copy", enabled = plan.fields.isNotEmpty(), onClick = {
+            val uri = ImageAirlock.export(context, preview)
+            val count = plan.fields.count { it.category in masked }
+            store.record(
+                Channel.B, Verdict.HANDED_BACK,
+                "Covered $count field(s) on an image; masked copy handed to you, original untouched",
+                masked = count,
+            )
+            val send = Intent(Intent.ACTION_SEND).setType("image/png").putExtra(Intent.EXTRA_STREAM, uri)
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            context.startActivity(Intent.createChooser(send, "Send masked image"))
+        })
+    }
+}
+
+/** Which planner is on duty. The model file only ever arrives by hand: nothing is downloaded. */
+@Composable
+private fun ModelCard(model: ModelStatus, installed: List<Pair<String, Long>>, onImport: () -> Unit, onPick: (String) -> Unit) {
+    var menu by remember { mutableStateOf(false) }
+    GlassCard(padding = 16.dp) {
+        SectionLabel("Local model")
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                val (title, detail) = when (model) {
+                    is ModelStatus.Ready -> model.name to "Running on this phone's CPU · loaded in ${model.loadMillis} ms" +
+                        if (installed.size > 1) " · ${installed.size} models installed" else ""
+                    is ModelStatus.Loading -> model.name to "Loading…"
+                    is ModelStatus.Failed -> model.name to "Could not load: ${model.reason}. Using the rule-based agent."
+                    ModelStatus.Missing -> "Rule-based agent" to "Import a .gguf (e.g. Hammer2.1-1.5B Q4) to plan with a local LLM."
+                }
+                Text(title, style = MaterialTheme.typography.titleMedium)
+                Text(detail, style = MaterialTheme.typography.bodyMedium, color = Frost.Ink2)
+            }
+            if (model is ModelStatus.Missing || model is ModelStatus.Failed) {
+                Pill("Import", strong = true, onClick = onImport)
+            } else if (model is ModelStatus.Ready && installed.size > 1) {
+                Box {
+                    Pill("Switch", onClick = { menu = true })
+                    // Every installed model, in the benchmark's order; the one running is ticked.
+                    DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                        installed.forEach { (name, bytes) ->
+                            DropdownMenuItem(
+                                text = { Text((if (name == model.name) "✓ " else "") + name + " · " + "%.1f GB".format(bytes / 1e9)) },
+                                onClick = { menu = false; if (name != model.name) onPick(name) },
+                            )
+                        }
+                        DropdownMenuItem(text = { Text("Import another .gguf") }, onClick = { menu = false; onImport() })
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** Says plainly how much of the file was read and what each part of the screen covers. */
+private fun fileNote(r: DocumentReader.Result): String {
+    val parts = mutableListOf(r.name)
+    r.pages?.let { parts += "$it page" + if (it == 1) "" else "s" }
+    parts += "read on this phone"
+    if (r.truncated) {
+        parts += if (r.complete) "summaries cover the whole file; the box shows the first 20,000 characters"
+        else "reading the rest for the summary…"
+    }
+    return parts.joinToString(" · ")
+}
+
+private fun displayName(context: Context, uri: Uri): String? =
+    context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
+        if (c.moveToFirst()) c.getString(0) else null
+    }
+
 @Composable
 private fun Mono(text: String) {
     SelectionContainer {
         Text(
             text,
-            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Color.White).padding(12.dp),
+            modifier = Modifier.fillMaxWidth().heightIn(max = 320.dp).clip(RoundedCornerShape(14.dp))
+                .background(Color.White).verticalScroll(rememberScrollState()).padding(12.dp),
             fontFamily = FontFamily.Monospace,
             style = MaterialTheme.typography.bodyMedium,
         )
@@ -181,8 +458,8 @@ private fun fieldColors() = OutlinedTextFieldDefaults.colors(
     unfocusedBorderColor = Color.Transparent,
 )
 
+private const val VAULT_ROWS = 40
 private const val EASY = "Summarise the key terms of this letter in three lines."
-private const val HARD = "Compare this against typical FY26 compensation bands for my role and tell me if I am underpaid."
 
 private const val SAMPLE = """Subject: Salary revision — FY 2026-27
 

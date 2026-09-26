@@ -59,6 +59,39 @@ class CheckoutTest {
         assertEquals(a.key, a.copy(evidence = a.evidence.replace("04:58", "04:57")).key)
     }
 
+    /** Chrome flattens a web checkout: every label and price is a sibling under one container. */
+    @Test fun `flat web checkouts pair each label with the price beside it`() {
+        val labels = listOf(
+            "Checkout", "Wireless earbuds", "₹2,499", "Delivery", "Free",
+            "[x]Add 1-year warranty protection", "₹199", "[x]Donate to a cause", "₹5",
+            "[x]Free 30-day trial of Plus membership, auto-renews at ₹179/mo", "Free",
+            "Platform fee", "₹29", "Total payable", "₹2,732",
+        )
+        val flat = ScreenNode(
+            "root",
+            children = labels.mapIndexed { i, l ->
+                val box = l.startsWith("[x]")
+                ScreenNode("n$i", text = l.removePrefix("[x]"), checkable = box, checked = box)
+            },
+        )
+        val web = DarkPatternScanner().scan(flat)
+        assertEquals(20400, web.recoverable) // ₹199 + ₹5
+        assertEquals(17900, web.recurring)
+        assertEquals(2900, web.disclosedOnly) // platform fee
+        assertFalse(web.findings.any { "earbuds" in it.evidence })
+    }
+
+    @Test fun `a word like payment without prices is not a checkout`() {
+        val feed = ScreenNode(
+            "root",
+            children = listOf(
+                ScreenNode("a", text = "New UPI payment rules explained"),
+                ScreenNode("b", text = "Hurry: festive sale guide"),
+            ),
+        )
+        assertFalse(DarkPatternScanner().scan(feed).isCheckout)
+    }
+
     @Test fun `non-checkout screens are ignored`() {
         val chat = ScreenNode("root", children = listOf(ScreenNode("m", text = "Only 2 left in the group chat lol")))
         assertFalse(DarkPatternScanner().scan(chat).isCheckout)

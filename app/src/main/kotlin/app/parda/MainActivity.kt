@@ -34,7 +34,12 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.core.app.NotificationManagerCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import android.net.Uri
+import android.widget.Toast
+import app.parda.data.DocumentReader
 import app.parda.service.CheckoutWatchService
+import kotlin.concurrent.thread
+import app.parda.service.DemoStoresActivity
 import app.parda.ui.components.FrostBackground
 import app.parda.ui.components.Icons
 import app.parda.ui.components.StrokeIcon
@@ -49,6 +54,7 @@ import app.parda.ui.theme.PardaTheme
 class MainActivity : ComponentActivity() {
     private var tab by mutableIntStateOf(TAB_HOME)
     private var sharedText by mutableStateOf<String?>(null)
+    private var sharedImage by mutableStateOf<Uri?>(null)
 
     /** Bumped on resume so permission state is re-read after a trip to Settings. */
     private var resumeTick by mutableIntStateOf(0)
@@ -74,9 +80,20 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun handleIntent(intent: Intent?) {
-        if (intent?.action == Intent.ACTION_SEND && intent.type == "text/plain") {
-            sharedText = intent.getStringExtra(Intent.EXTRA_TEXT)
-            tab = TAB_AIRLOCK
+        if (intent?.action != Intent.ACTION_SEND) return
+        val text = intent.getStringExtra(Intent.EXTRA_TEXT)
+        @Suppress("DEPRECATION")
+        val stream = intent.getParcelableExtra<Uri>(Intent.EXTRA_STREAM)
+        when {
+            stream != null && intent.type?.startsWith("image/") == true -> { sharedImage = stream; tab = TAB_AIRLOCK }
+            stream != null -> thread(name = "parda-read") {
+                val read = runCatching { DocumentReader.read(this, stream) }
+                runOnUiThread {
+                    read.onSuccess { sharedText = it.text; tab = TAB_AIRLOCK }
+                        .onFailure { Toast.makeText(this, it.message ?: "Could not read that file.", Toast.LENGTH_LONG).show() }
+                }
+            }
+            text != null -> { sharedText = text; tab = TAB_AIRLOCK }
         }
     }
 
@@ -107,9 +124,13 @@ class MainActivity : ComponentActivity() {
                 return@FrostBackground
             }
             when (tab) {
-                TAB_HOME -> HomeScreen(serviceOn, totals, egress, entries, ::openAccessibilitySettings) { tab = TAB_LEDGER }
+                TAB_HOME -> HomeScreen(
+                    serviceOn, totals, egress, entries, ::openAccessibilitySettings,
+                    onOpenLedger = { tab = TAB_LEDGER },
+                    onTryDemo = { startActivity(Intent(this@MainActivity, DemoStoresActivity::class.java)) },
+                )
                 TAB_FIREWALL -> FirewallScreen(policy, store::setPolicy)
-                TAB_AIRLOCK -> AirlockScreen(sharedText)
+                TAB_AIRLOCK -> AirlockScreen(sharedText, sharedImage)
                 TAB_LEDGER -> LedgerScreen(entries, chainIntact, internetDeclared, egress)
             }
             FloatingNav(tab, { tab = it }, Modifier.align(Alignment.BottomCenter))
