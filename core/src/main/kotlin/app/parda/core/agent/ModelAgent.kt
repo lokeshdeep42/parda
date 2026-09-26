@@ -1,0 +1,89 @@
+package app.parda.core.agent
+
+/** A local text generator. On the phone this is llama.cpp; in tests it is a fake. */
+fun interface TextEngine {
+    /**
+     * Completes [prompt]. When [grammar] is set, sampling is constrained to it, so the output
+     * can only be a string the grammar accepts.
+     */
+    fun complete(prompt: String, grammar: String?, maxTokens: Int): String
+}
+
+/**
+ * The on-device planner: Hammer2.1 (or any ChatML function-calling model) behind [engine].
+ * Planning is grammar-constrained, so the model can only pick one of the enumerated calls.
+ * Local answers are free text, but they are only ever shown on this screen, never handed back.
+ *
+ * A small model can misroute a question that plainly needs outside facts ("is this legal?") to a
+ * local task. [guard] is a deterministic veto for those: when it says the request needs outside
+ * knowledge, that wins. Handing back is the conservative path, since only the sanitized copy goes.
+ */
+class ModelAgent(
+    private val engine: TextEngine,
+    private val guard: LocalAgent = RuleBasedAgent(),
+) : LocalAgent {
+
+    override fun plan(request: String, document: String): AgentPlan {
+        val veto = guard.plan(request, document)
+        if (veto == AgentPlan.HandBack(HandBackReason.NEEDS_OUTSIDE_KNOWLEDGE)) return veto
+        return AgentGrammar.parse(engine.complete(HammerPrompt.plan(request, document), AgentGrammar.GBNF, PLAN_TOKENS))
+    }
+
+    override fun answer(task: LocalTask, request: String, document: String): String? =
+        engine.complete(HammerPrompt.answer(task, request, document), null, ANSWER_TOKENS)
+            .trim()
+            .takeIf { it.isNotEmpty() }
+
+    private companion object {
+        const val PLAN_TOKENS = 48
+        const val ANSWER_TOKENS = 220
+    }
+}
+
+/** Prompts in Hammer2.1's tool-calling format, wrapped in the ChatML template it was tuned on. */
+object HammerPrompt {
+    /** The planner only needs the gist of the document to decide; a short excerpt keeps it fast. */
+    private const val PLAN_EXCERPT = 600
+    private const val ANSWER_EXCERPT = 3000
+
+    fun plan(request: String, document: String): String = chatml(
+        system = "You are a helpful assistant.",
+        user = """
+            |[BEGIN OF TASK INSTRUCTION]
+            |You are a tool calling assistant running on the user's phone. Pick exactly one tool.
+            |Use answer_locally when the request can be done using only the document: summarising it, extracting its facts, or rewriting it.
+            |Use hand_back with reason "needs_outside_knowledge" when the request needs facts that are not in the document: market rates, pay bands, laws, news, comparisons, advice.
+            |Use hand_back with reason "too_complex" only when the request is about the document itself but too hard to do reliably.
+            |[END OF TASK INSTRUCTION]
+            |
+            |[BEGIN OF AVAILABLE TOOLS]
+            |${AgentGrammar.TOOLS_JSON}
+            |[END OF AVAILABLE TOOLS]
+            |
+            |[BEGIN OF FORMAT INSTRUCTION]
+            |Reply with one JSON object {"name": <tool>, "arguments": {...}} and nothing else.
+            |[END OF FORMAT INSTRUCTION]
+            |
+            |[BEGIN OF QUERY]
+            |Document (excerpt):
+            |${document.take(PLAN_EXCERPT)}
+            |
+            |Request: $request
+            |[END OF QUERY]
+        """.trimMargin(),
+    )
+
+    fun answer(task: LocalTask, request: String, document: String): String = chatml(
+        system = "You answer strictly from the document the user gives you. If the document does not say, reply that it does not say. Be brief.",
+        user = "${instruction(task)}\n\nDocument:\n${document.take(ANSWER_EXCERPT)}\n\nRequest: $request",
+    )
+
+    private fun instruction(task: LocalTask) = when (task) {
+        LocalTask.SUMMARISE -> "Summarise the document in at most three short bullet points."
+        LocalTask.EXTRACT -> "List the names, amounts, dates and identifiers in the document, one per line."
+        LocalTask.REWRITE -> "Rewrite the document as asked, keeping every fact unchanged."
+    }
+
+    private fun chatml(system: String, user: String) =
+        "<|im_start|>system\n$system<|im_end|>\n<|im_start|>user\n$user<|im_end|>\n<|im_start|>assistant\n"
+}

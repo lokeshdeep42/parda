@@ -7,8 +7,15 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      LLAMA_CPP_COMMIT: 84e76d8a23162eca70490da131945ebec1f09bf4
     steps:
       - uses: actions/checkout@v4
+      - name: Fetch llama.cpp (pinned, built from source by the NDK)
+        run: |
+          git init -q ../llama.cpp
+          git -C ../llama.cpp fetch -q --depth 1 https://github.com/ggml-org/llama.cpp "$LLAMA_CPP_COMMIT"
+          git -C ../llama.cpp checkout -q FETCH_HEAD
       - uses: actions/setup-java@v4
         with:
           distribution: temurin

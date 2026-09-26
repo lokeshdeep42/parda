@@ -13,6 +13,7 @@
     <application
         android:name=".PardaApp"
         android:allowBackup="false"
+        android:extractNativeLibs="true"
         android:icon="@drawable/ic_parda"
         android:roundIcon="@drawable/ic_parda"
         android:label="@string/app_name"

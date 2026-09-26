@@ -45,7 +45,7 @@ class RuleBasedAgent(private val classifier: Classifier = Classifier()) : LocalA
         val OUTSIDE = listOf(
             "compare", "typical", "market", "benchmark", "average", "industry", "latest", "current rate",
             "news", "underpaid", "overpaid", "is this fair", "should i", "research", "search", "look up",
-            "legal advice", "what is the law",
+            "legal", " law", "tax rule", "regulation",
         )
         val SUMMARISE = listOf("summar", "tl;dr", "tldr", "key terms", "key points", "gist", "in short", "main points")
         val EXTRACT = listOf("extract", "list the", "pull out", "what are the numbers", "find the", "which amounts")

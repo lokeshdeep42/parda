@@ -49,7 +49,12 @@ index.html   The original single-file web prototype of both channels.
 
 ## Build
 
-Requirements: JDK 17+, Android SDK (API 35).
+Requirements: JDK 17+, Android SDK (API 35). The Gradle plugin installs the NDK and CMake on
+first build. llama.cpp is compiled from source and is expected next to this repo:
+
+```sh
+git clone https://github.com/ggml-org/llama.cpp ../llama.cpp   # or -Pparda.llamaDir=<path>
+```
 
 ```sh
 ./gradlew :core:test                 # logic tests, no Android SDK needed
@@ -59,6 +64,23 @@ Requirements: JDK 17+, Android SDK (API 35).
 
 CI (`.github/workflows/build.yml`) runs the core tests, builds the APK, checks it declares no
 network permission, and uploads it as an artifact.
+
+## On-device model
+
+Channel B plans with a local LLM when one is on the phone, and falls back to the rule-based
+agent when not. Parda never downloads it. Put a GGUF on the phone by hand, either:
+
+```sh
+adb push Hammer2.1-1.5b-Q4_K_M.gguf /sdcard/Android/data/app.parda/files/models/
+```
+
+or **Airlock → Local model → Import** and pick the file. The model loads at app start
+(`ModelStatus` on the Airlock card). Planning runs under `AgentGrammar.GBNF`, so the model can
+only emit one of the two enumerated calls; the answer to a local task is shown on screen only.
+Load and per-request timings are logged under the Logcat tag `PardaLLM`.
+
+Code: `core/.../agent/ModelAgent.kt` (prompt + agent, tested with a fake engine) and
+`app/src/main/cpp/parda_llm.cpp` + `app/.../llm/LlamaEngine.kt` (JNI to llama.cpp).
 
 ## Try it
 
@@ -77,11 +99,12 @@ network permission, and uploads it as an artifact.
 Done: the core engine for both channels, with tests; the Android app shell, accessibility
 service, intercept sheet, text-selection masking, share target, policy editor and ledger.
 
+Also done: the on-device model (llama.cpp, GBNF-constrained planning), with the rule-based agent
+as fallback.
+
 Next:
-- **On-device model.** Wire Hammer2.1-1.5B (GGUF, Q4) through llama.cpp's Android JNI as a
-  `LocalAgent`, passing `AgentGrammar.GBNF` as the sampling grammar and `AgentGrammar.TOOLS_JSON`
-  as the tool list, then swap it in `PardaStore.gate`. `RuleBasedAgent` stays as the fallback.
-  The model file ships in the APK or is side-loaded; it is never downloaded by Parda.
+- Measure Hammer2.1-1.5B plan/answer latency on the target phone; tune the prompt if it
+  misroutes the demo questions.
 - **Airlock for images.** Mask ID numbers and addresses in photos before sharing, using an
   on-device OCR model bundled in the APK.
 - Tune the checkout scanner against real apps' accessibility trees, and add app-specific rules

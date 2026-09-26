@@ -1,6 +1,11 @@
 package app.parda.ui.screens
 
+import android.content.Context
 import android.content.Intent
+import android.net.Uri
+import android.provider.OpenableColumns
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -18,6 +23,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -29,7 +35,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.parda.core.agent.GateDecision
+import app.parda.data.ModelStatus
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import app.parda.core.ledger.Channel
 import app.parda.core.ledger.Verdict
 import app.parda.store
@@ -55,12 +66,24 @@ fun AirlockScreen(initialText: String?) {
     var request by rememberSaveable { mutableStateOf("") }
     var reply by rememberSaveable { mutableStateOf("") }
     var decision by remember { mutableStateOf<GateDecision?>(null) }
+    var thinking by remember { mutableStateOf(false) }
+    val model by store.model.collectAsStateWithLifecycle()
+    val scope = rememberCoroutineScope()
+
+    val pickModel = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            val name = displayName(context, uri) ?: "model.gguf"
+            scope.launch(Dispatchers.IO) { store.importModel(uri, name) }
+        }
+    }
 
     ScreenColumn {
         Column {
             Text("Airlock", style = MaterialTheme.typography.headlineLarge)
             Text("Mask it before you share it", style = MaterialTheme.typography.bodyLarge, color = Frost.Ink2)
         }
+
+        ModelCard(model, onImport = { pickModel.launch(arrayOf("*/*")) })
 
         GlassCard(padding = 16.dp) {
             SectionLabel("Inside this phone")
@@ -84,21 +107,32 @@ fun AirlockScreen(initialText: String?) {
                 Pill("Summarise", onClick = { request = EASY; decision = null })
                 Pill("Am I underpaid?", onClick = { request = HARD; decision = null })
             }
-            PrimaryButton("Ask the agent", enabled = document.isNotBlank(), onClick = {
-                val d = store.gate.handle(document, request.ifBlank { EASY }, store.policy.value)
-                decision = d
-                when (d) {
-                    is GateDecision.HeldLocally -> store.record(
-                        Channel.B, Verdict.HELD_LOCALLY,
-                        "${d.result.detections.size} sensitive item(s) classified; answered on the device, nothing prepared to send",
-                    )
-                    is GateDecision.HandedBack -> store.record(
-                        Channel.B, Verdict.HANDED_BACK,
-                        "${d.result.vault.withheld} item(s) withheld (${d.result.blockedCount} blocked); sanitized copy prepared, nothing transmitted",
-                        masked = d.result.vault.withheld,
-                    )
-                }
-            })
+            PrimaryButton(
+                if (thinking) "Thinking on this phone…" else "Ask the agent",
+                enabled = document.isNotBlank() && !thinking,
+                onClick = {
+                    thinking = true
+                    scope.launch {
+                        val planner = (model as? ModelStatus.Ready)?.name ?: "rule-based agent"
+                        val d = withContext(Dispatchers.Default) {
+                            store.gate.handle(document, request.ifBlank { EASY }, store.policy.value)
+                        }
+                        decision = d
+                        thinking = false
+                        when (d) {
+                            is GateDecision.HeldLocally -> store.record(
+                                Channel.B, Verdict.HELD_LOCALLY,
+                                "${d.result.detections.size} sensitive item(s) classified; answered on the device by $planner, nothing prepared to send",
+                            )
+                            is GateDecision.HandedBack -> store.record(
+                                Channel.B, Verdict.HANDED_BACK,
+                                "${d.result.vault.withheld} item(s) withheld (${d.result.blockedCount} blocked); planned by $planner; sanitized copy prepared, nothing transmitted",
+                                masked = d.result.vault.withheld,
+                            )
+                        }
+                    }
+                },
+            )
         }
 
         when (val d = decision) {
@@ -160,6 +194,34 @@ fun AirlockScreen(initialText: String?) {
         }
     }
 }
+
+/** Which planner is on duty. The model file only ever arrives by hand: nothing is downloaded. */
+@Composable
+private fun ModelCard(model: ModelStatus, onImport: () -> Unit) {
+    GlassCard(padding = 16.dp) {
+        SectionLabel("Local model")
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                val (title, detail) = when (model) {
+                    is ModelStatus.Ready -> model.name to "Running on this phone's CPU · loaded in ${model.loadMillis} ms"
+                    is ModelStatus.Loading -> model.name to "Loading…"
+                    is ModelStatus.Failed -> model.name to "Could not load: ${model.reason}. Using the rule-based agent."
+                    ModelStatus.Missing -> "Rule-based agent" to "Import a .gguf (e.g. Hammer2.1-1.5B Q4) to plan with a local LLM."
+                }
+                Text(title, style = MaterialTheme.typography.titleMedium)
+                Text(detail, style = MaterialTheme.typography.bodyMedium, color = Frost.Ink2)
+            }
+            if (model is ModelStatus.Missing || model is ModelStatus.Failed) {
+                Pill("Import", strong = true, onClick = onImport)
+            }
+        }
+    }
+}
+
+private fun displayName(context: Context, uri: Uri): String? =
+    context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
+        if (c.moveToFirst()) c.getString(0) else null
+    }
 
 @Composable
 private fun Mono(text: String) {

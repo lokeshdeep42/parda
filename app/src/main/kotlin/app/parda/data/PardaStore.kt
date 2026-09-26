@@ -2,8 +2,10 @@ package app.parda.data
 
 import android.content.Context
 import android.net.TrafficStats
+import android.net.Uri
 import android.os.Process
 import app.parda.core.agent.DisclosureGate
+import app.parda.core.agent.ModelAgent
 import app.parda.core.agent.RuleBasedAgent
 import app.parda.core.checkout.DarkPatternScanner
 import app.parda.core.disclosure.Sanitizer
@@ -12,6 +14,7 @@ import app.parda.core.ledger.Ledger
 import app.parda.core.ledger.LedgerEntry
 import app.parda.core.ledger.Verdict
 import app.parda.core.policy.Policy
+import app.parda.llm.LlamaEngine
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -30,8 +33,19 @@ class PardaStore(context: Context) {
     val sanitizer = Sanitizer()
     val scanner = DarkPatternScanner()
 
-    // Swap RuleBasedAgent for the llama.cpp-backed agent once a model is installed.
-    val gate = DisclosureGate(RuleBasedAgent(), sanitizer = sanitizer)
+    private val nativeLibDir = context.applicationInfo.nativeLibraryDir
+    private val importDir = File(context.filesDir, "models")
+    /** `adb push model.gguf /sdcard/Android/data/app.parda/files/models/` lands here. */
+    private val pushDir: File? = context.getExternalFilesDir("models")
+    private val contentResolver = context.contentResolver
+
+    @Volatile private var engine: LlamaEngine? = null
+    private val _model = MutableStateFlow<ModelStatus>(ModelStatus.Missing)
+    val model: StateFlow<ModelStatus> = _model.asStateFlow()
+
+    /** The on-device model when one is loaded; the rule-based agent otherwise. */
+    val gate: DisclosureGate
+        get() = DisclosureGate(engine?.let(::ModelAgent) ?: RuleBasedAgent(), sanitizer = sanitizer)
 
     private val _policy = MutableStateFlow(loadPolicy())
     val policy: StateFlow<Policy> = _policy.asStateFlow()
@@ -69,6 +83,43 @@ class PardaStore(context: Context) {
         _entries.value = ledger.all
     }
 
+    /**
+     * Finds a .gguf on the phone and loads it. Blocking and slow (seconds): call off the main
+     * thread. Nothing is downloaded; the model gets here by `adb push` or [importModel].
+     */
+    @Synchronized
+    fun loadModel() {
+        val file = listOfNotNull(importDir, pushDir)
+            .flatMap { it.listFiles { f -> f.extension.equals("gguf", ignoreCase = true) }.orEmpty().toList() }
+            .maxByOrNull { it.lastModified() }
+            ?: run { _model.value = ModelStatus.Missing; return }
+        if ((_model.value as? ModelStatus.Ready)?.name == file.nameWithoutExtension) return
+
+        _model.value = ModelStatus.Loading(file.nameWithoutExtension)
+        val started = System.currentTimeMillis()
+        runCatching { LlamaEngine.load(nativeLibDir, file) }
+            .onSuccess { loaded ->
+                engine?.close()
+                engine = loaded
+                _model.value = ModelStatus.Ready(loaded.modelName, System.currentTimeMillis() - started)
+            }
+            .onFailure { _model.value = ModelStatus.Failed(file.nameWithoutExtension, it.message ?: "load failed") }
+    }
+
+    /** Copies a .gguf picked with the system file picker into app storage, then loads it. Blocking. */
+    fun importModel(uri: Uri, displayName: String) {
+        _model.value = ModelStatus.Loading(displayName.substringBeforeLast('.'))
+        runCatching {
+            importDir.mkdirs()
+            val target = File(importDir, displayName.takeIf { it.endsWith(".gguf", true) } ?: "$displayName.gguf")
+            contentResolver.openInputStream(uri)!!.use { input -> target.outputStream().use { input.copyTo(it) } }
+        }.onFailure {
+            _model.value = ModelStatus.Failed(displayName, it.message ?: "copy failed")
+            return
+        }
+        loadModel()
+    }
+
     fun totals(): Ledger.Totals = ledger.totals()
 
     fun ledgerIntact(): Boolean = ledger.verify() == -1
@@ -84,4 +135,13 @@ class PardaStore(context: Context) {
         const val KEY_POLICY = "policy"
         const val KEY_ONBOARDED = "onboarded"
     }
+}
+
+/** Which planner Channel B is using. */
+sealed interface ModelStatus {
+    /** No model on the phone: the rule-based agent plans. */
+    data object Missing : ModelStatus
+    data class Loading(val name: String) : ModelStatus
+    data class Ready(val name: String, val loadMillis: Long) : ModelStatus
+    data class Failed(val name: String, val reason: String) : ModelStatus
 }
