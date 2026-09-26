@@ -156,13 +156,15 @@ object Detectors {
         ),
     )
     private const val CAP = """[A-Z][a-z]+"""
+    // Name parts are joined by spaces or tabs only: a name never continues onto the next line.
+    private const val NAME = """(?:[A-Z]\.[ \t]?)*$CAP(?:[ \t]+$CAP){0,2}"""
     val NAME_HONORIFIC = RegexDetector(
         DataCategory.PERSON_NAME, "Name",
-        Regex("""\b(?:Mr|Ms|Mrs|Dr|Shri|Smt|Kumari)\.?\s+(?<v>(?:[A-Z]\.\s?)*$CAP(?:\s+$CAP){0,2})\b"""),
+        Regex("""\b(?:Mr|Ms|Mrs|Dr|Shri|Smt|Kumari)\.?[ \t]+(?<v>$NAME)\b"""),
     )
     val NAME_LABELLED = RegexDetector(
         DataCategory.PERSON_NAME, "Name",
-        Regex("""(?:\b(?:[Nn]ame|NAME)\s*[:\-]\s*|\bDear\s+)(?<v>(?:[A-Z]\.\s?)*$CAP(?:\s+$CAP){0,2})\b"""),
+        Regex("""(?:\b(?:[Nn]ame|NAME)[ \t]*[:\-][ \t]*|\bDear[ \t]+)(?<v>$NAME)\b"""),
         accept = { it !in setOf("Sir", "Madam", "Customer", "Team", "User", "Friend", "All") },
     )
 

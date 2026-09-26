@@ -41,7 +41,7 @@ object DocumentReader {
             when {
                 mime == "application/pdf" || ext == "pdf" -> {
                     PDFBoxResourceLoader.init(context.applicationContext)
-                    PDDocument.load(input).use { PDFTextStripper().getText(it) }
+                    PDDocument.load(input).use { pdf -> pdfText(pdf) }
                 }
                 ext == "docx" || mime.endsWith("wordprocessingml.document") -> OfficeText.docx(input)
                 ext == "xlsx" || mime.endsWith("spreadsheetml.sheet") -> OfficeText.xlsx(input)
@@ -55,5 +55,18 @@ object DocumentReader {
             throw Unsupported("No text found in $name. If it is a scanned image, it has no text layer to read.")
         }
         return Result(name, text.take(MAX_CHARS), text.length > MAX_CHARS)
+    }
+
+    /** Page by page, stopping once there is more than [MAX_CHARS]: a 300-page PDF need not be read whole. */
+    private fun pdfText(pdf: PDDocument): String {
+        val stripper = PDFTextStripper()
+        val out = StringBuilder()
+        for (page in 1..pdf.numberOfPages) {
+            stripper.startPage = page
+            stripper.endPage = page
+            out.append(stripper.getText(pdf))
+            if (out.length > MAX_CHARS) break
+        }
+        return out.toString()
     }
 }

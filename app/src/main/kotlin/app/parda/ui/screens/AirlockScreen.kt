@@ -7,6 +7,8 @@ import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -112,7 +114,9 @@ fun AirlockScreen(initialText: String?) {
             OutlinedTextField(
                 value = document,
                 onValueChange = { document = it; decision = null },
-                modifier = Modifier.fillMaxWidth().heightIn(min = 160.dp),
+                // Capped so a long document scrolls inside the box instead of pushing the
+                // question and the Ask button off the bottom of the screen.
+                modifier = Modifier.fillMaxWidth().heightIn(min = 160.dp, max = 320.dp),
                 textStyle = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
                 label = { Text("Text you are about to send") },
                 colors = fieldColors(),
@@ -190,11 +194,15 @@ fun AirlockScreen(initialText: String?) {
                 }
                 GlassCard(padding = 16.dp) {
                     SectionLabel("Vault — never leaves this phone")
-                    d.result.vault.entries.forEach { e ->
+                    val entries = d.result.vault.entries
+                    entries.take(VAULT_ROWS).forEach { e ->
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                             Text(e.token, fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.bodyMedium)
                             Text(e.real, style = MaterialTheme.typography.bodyMedium, color = Frost.WarnInk)
                         }
+                    }
+                    if (entries.size > VAULT_ROWS) {
+                        Text("and ${entries.size - VAULT_ROWS} more, all held on this phone", style = MaterialTheme.typography.bodyMedium, color = Frost.Ink2)
                     }
                 }
                 GlassCard(padding = 16.dp) {
@@ -250,7 +258,8 @@ private fun Mono(text: String) {
     SelectionContainer {
         Text(
             text,
-            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Color.White).padding(12.dp),
+            modifier = Modifier.fillMaxWidth().heightIn(max = 320.dp).clip(RoundedCornerShape(14.dp))
+                .background(Color.White).verticalScroll(rememberScrollState()).padding(12.dp),
             fontFamily = FontFamily.Monospace,
             style = MaterialTheme.typography.bodyMedium,
         )
@@ -265,6 +274,7 @@ private fun fieldColors() = OutlinedTextFieldDefaults.colors(
     unfocusedBorderColor = Color.Transparent,
 )
 
+private const val VAULT_ROWS = 40
 private const val EASY = "Summarise the key terms of this letter in three lines."
 private const val HARD = "Compare this against typical FY26 compensation bands for my role and tell me if I am underpaid."
 
