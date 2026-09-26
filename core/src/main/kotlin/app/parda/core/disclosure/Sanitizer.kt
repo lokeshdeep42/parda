@@ -7,6 +7,7 @@ import app.parda.core.policy.DisclosureAction
 import app.parda.core.policy.Policy
 
 /** One substitution made at the gate. Held on the device only. */
+@kotlinx.serialization.Serializable
 data class VaultEntry(
     val token: String,
     val real: String,
@@ -17,7 +18,7 @@ data class VaultEntry(
     val restorable: Boolean get() = action == DisclosureAction.SURROGATE
 }
 
-/** Surrogate token -> real value map. Never serialised, never transmitted. */
+/** Surrogate token -> real value map. Never transmitted; kept on the phone by [VaultArchive], encrypted. */
 class Vault(val entries: List<VaultEntry>) {
     private val byToken = entries.filter { it.restorable }.associateBy { it.token.removeSurrounding("<", ">") }
 

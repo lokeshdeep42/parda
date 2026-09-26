@@ -46,6 +46,7 @@ import app.parda.ui.components.StrokeIcon
 import app.parda.ui.screens.AirlockScreen
 import app.parda.ui.screens.FirewallScreen
 import app.parda.ui.screens.HomeScreen
+import app.parda.ui.screens.ShieldStatus
 import app.parda.ui.screens.LedgerScreen
 import app.parda.ui.screens.OnboardingScreen
 import app.parda.ui.theme.Frost
@@ -125,7 +126,10 @@ class MainActivity : ComponentActivity() {
             }
             when (tab) {
                 TAB_HOME -> HomeScreen(
-                    serviceOn, totals, egress, entries, ::openAccessibilitySettings,
+                    ShieldStatus(serviceOn, CheckoutWatchService.running, CheckoutWatchService.lastEventAt, notificationsOn),
+                    totals, egress, entries, ::openAccessibilitySettings,
+                    onBackgroundSettings = ::openAppSettings,
+                    onNotifications = ::requestNotifications,
                     onOpenLedger = { tab = TAB_LEDGER },
                     onTryDemo = { startActivity(Intent(this@MainActivity, DemoStoresActivity::class.java)) },
                 )
@@ -135,6 +139,11 @@ class MainActivity : ComponentActivity() {
             }
             FloatingNav(tab, { tab = it }, Modifier.align(Alignment.BottomCenter))
         }
+    }
+
+    /** The app's own settings page, where phones put battery and background-running controls. */
+    private fun openAppSettings() {
+        startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, android.net.Uri.fromParts("package", packageName, null)))
     }
 
     private fun openAccessibilitySettings() {

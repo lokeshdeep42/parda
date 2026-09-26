@@ -37,16 +37,31 @@ import app.parda.ui.components.Stat
 import app.parda.ui.components.StrokeIcon
 import app.parda.ui.theme.Frost
 
+/**
+ * Whether the shield can really see checkouts. "Switched on" in Settings is not enough: some
+ * phones (iQOO among them) stop accessibility services after an update or to save battery.
+ */
+data class ShieldStatus(
+    val enabled: Boolean,
+    val running: Boolean,
+    /** When it last read anything on screen; 0 if never since the app started. */
+    val lastEventAt: Long,
+    val notificationsOn: Boolean,
+)
+
 @Composable
 fun HomeScreen(
-    serviceOn: Boolean,
+    shield: ShieldStatus,
     totals: Ledger.Totals,
     egressBytes: Long,
     entries: List<LedgerEntry>,
     onEnableService: () -> Unit,
+    onBackgroundSettings: () -> Unit,
+    onNotifications: () -> Unit,
     onOpenLedger: () -> Unit,
     onTryDemo: () -> Unit,
 ) {
+    val serviceOn = shield.enabled && shield.running
     ScreenColumn {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             StrokeIcon(Icons.Shield, size = 22.dp)
@@ -65,10 +80,13 @@ fun HomeScreen(
                         Text("  Active · on-device", style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 7.dp, bottom = 7.dp, end = 12.dp))
                     }
                     Pill("Try a demo checkout", strong = true, onClick = onTryDemo)
+                } else if (shield.enabled) {
+                    Pill("Shield stopped — fix", strong = true, onClick = onEnableService)
                 } else {
                     Pill("Shield is off — turn on", strong = true, onClick = onEnableService)
                 }
             }
+            ShieldNote(shield, onBackgroundSettings, onNotifications)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Stat("${totals.patternsCaught}", "Dark patterns caught", Modifier.weight(1f))
                 Stat(Money.format(totals.savedPaise), "Saved", Modifier.weight(1f))
@@ -123,6 +141,24 @@ fun HomeScreen(
             }
         }
         Spacer(Modifier.height(4.dp))
+    }
+}
+
+/** One line under the shield status: what it last saw, or exactly what to do to get it back. */
+@Composable
+private fun ShieldNote(shield: ShieldStatus, onBackground: () -> Unit, onNotifications: () -> Unit) {
+    val (text, action) = when {
+        !shield.enabled -> "Parda can't see checkouts until you allow it in Accessibility." to null
+        !shield.running -> "It is switched on, but Android stopped it. In Accessibility, turn Parda off and on; " +
+            "then let Parda run in the background so it is not stopped again." to ("Background settings" to onBackground)
+        !shield.notificationsOn -> "Notifications are off, so flags that don't pause a checkout can't reach you." to
+            ("Allow" to onNotifications)
+        shield.lastEventAt > 0 -> "Watching · last read a screen ${timeAgo(shield.lastEventAt)}." to null
+        else -> "Watching · open any shopping app and Parda reads its checkout." to null
+    }
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+        Text(text, style = MaterialTheme.typography.bodyMedium, color = if (action != null || !shield.enabled) Frost.WarnInk else Frost.Ink2, modifier = Modifier.weight(1f))
+        action?.let { (label, onClick) -> Spacer(Modifier.width(8.dp)); Pill(label, onClick = onClick) }
     }
 }
 

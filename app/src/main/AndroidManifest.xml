@@ -21,6 +21,7 @@
     <application
         android:name=".PardaApp"
         android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
         android:extractNativeLibs="true"
         android:icon="@drawable/ic_parda"
         android:roundIcon="@drawable/ic_parda"
