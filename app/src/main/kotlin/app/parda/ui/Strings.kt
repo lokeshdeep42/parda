@@ -66,6 +66,8 @@ val DataCategory.title: String
             DataCategory.DATE_OF_BIRTH -> R.string.cat_dob
             DataCategory.HEALTH_ID -> R.string.cat_health_id
             DataCategory.HEALTH_CONDITION -> R.string.cat_condition
+            DataCategory.FACE_PHOTO -> R.string.cat_face
+            DataCategory.QR_CODE -> R.string.cat_qr
         },
     )
 
@@ -76,6 +78,7 @@ val DisclosureAction.title: String
             DisclosureAction.SURROGATE -> R.string.disc_surrogate
             DisclosureAction.KEEP_LAST_4 -> R.string.disc_last4
             DisclosureAction.ALLOW -> R.string.disc_allow
+            DisclosureAction.STAND_IN -> R.string.disc_stand_in
         },
     )
 

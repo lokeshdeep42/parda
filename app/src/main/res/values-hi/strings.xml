@@ -30,10 +30,13 @@
     <string name="cat_dob">जन्म तिथियाँ</string>
     <string name="cat_health_id">स्वास्थ्य रिकॉर्ड आईडी</string>
     <string name="cat_condition">बीमारियाँ और निदान</string>
+    <string name="cat_face">चेहरे की फ़ोटो</string>
+    <string name="cat_qr">QR कोड और बारकोड</string>
     <string name="disc_block">पूरी तरह रोकें</string>
     <string name="disc_surrogate">प्लेसहोल्डर से बदलें</string>
     <string name="disc_last4">आख़िरी 4 छोड़कर छिपाएँ</string>
     <string name="disc_allow">जाने दें</string>
+    <string name="disc_stand_in">असली जैसे नकली से बदलें</string>
     <string name="co_auto">अपने-आप हटाएँ</string>
     <string name="co_ask">मुझसे पूछें</string>
     <string name="co_flag">सिर्फ़ बताएँ</string>

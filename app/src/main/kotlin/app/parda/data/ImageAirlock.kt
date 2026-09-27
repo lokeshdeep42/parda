@@ -15,11 +15,17 @@ import androidx.core.content.FileProvider
 import app.parda.core.image.Box
 import app.parda.core.image.ImageMaskPlan
 import app.parda.core.image.ImageMasker
+import app.parda.core.image.ImageRegion
 import app.parda.core.image.OcrLine
 import app.parda.core.image.OcrWord
 import app.parda.core.policy.Policy
 import com.google.android.gms.tasks.Tasks
+import com.google.mlkit.vision.barcode.BarcodeScannerOptions
+import com.google.mlkit.vision.barcode.BarcodeScanning
+import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.face.FaceDetection
+import com.google.mlkit.vision.face.FaceDetectorOptions
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.devanagari.DevanagariTextRecognizerOptions
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
@@ -39,6 +45,22 @@ object ImageAirlock {
 
     private val latin by lazy { TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS) }
     private val devanagari by lazy { TextRecognition.getClient(DevanagariTextRecognizerOptions.Builder().build()) }
+    private val faces by lazy {
+        FaceDetection.getClient(
+            FaceDetectorOptions.Builder()
+                .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_ACCURATE)
+                // The photo on a card photographed from arm's length is small in the frame.
+                .setMinFaceSize(0.05f)
+                .build(),
+        )
+    }
+    private val codes by lazy {
+        BarcodeScanning.getClient(
+            BarcodeScannerOptions.Builder()
+                .setBarcodeFormats(Barcode.FORMAT_QR_CODE, Barcode.FORMAT_PDF417, Barcode.FORMAT_DATA_MATRIX, Barcode.FORMAT_AZTEC)
+                .build(),
+        )
+    }
     private val masker = ImageMasker()
 
     /** Blocking: call off the main thread. */
@@ -77,10 +99,18 @@ object ImageAirlock {
                 },
             )
         }
-        val plan = masker.plan(lines, policy)
+        // Not text: the photo and the QR code. Either detector failing costs only its own boxes;
+        // on an ID card the layout still places both.
+        val regions = runCatching {
+            Tasks.await(faces.process(image)).map { f -> f.boundingBox.let { ImageRegion(ImageRegion.Kind.FACE, Box(it.left, it.top, it.right, it.bottom)) } }
+        }.getOrDefault(emptyList()) + runCatching {
+            Tasks.await(codes.process(image)).mapNotNull { c -> c.boundingBox?.let { ImageRegion(ImageRegion.Kind.CODE, Box(it.left, it.top, it.right, it.bottom)) } }
+        }.getOrDefault(emptyList())
+        val plan = masker.plan(lines, policy, regions)
         if (BuildConfigCompat.debuggable) {
             // Debug builds only: what OCR read and what was covered, for tuning.
-            lines.forEach { l -> Log.i(TAG, l.words.joinToString(" | ") { "${it.text}@${it.box.left}-${it.box.right}" }) }
+            lines.forEach { l -> Log.i(TAG, l.words.joinToString(" | ") { "${it.text}@${it.box.left},${it.box.top}-${it.box.right},${it.box.bottom}" }) }
+            regions.forEach { r -> Log.i(TAG, "region ${r.kind} ${r.box}") }
             plan.fields.forEach { f -> Log.i(TAG, "field ${f.category} '${f.value}' ${f.boxes}") }
         }
         return Result(bitmap, plan)
