@@ -145,8 +145,9 @@ object Detectors {
     val DOB = RegexDetector(
         DataCategory.DATE_OF_BIRTH, "Date of birth",
         Regex(
-            """(?i)\b(?:dob|d\.o\.b\.?|date of birth|born on)\s*[:\-]?\s*""" +
-                """(?<v>\d{1,2}[/.\- ]\d{1,2}[/.\- ]\d{2,4}|\d{1,2}\s+[A-Za-z]{3,9},?\s+\d{4})""",
+            """(?i)\b(?:dob|d\.o\.b\.?|date of birth|born on|yob|year of birth)\s*[:\-]?\s*""" +
+                // Older Aadhaar cards print only the year: "Year of Birth : 1990".
+                """(?<v>\d{1,2}[/.\- ]\d{1,2}[/.\- ]\d{2,4}|\d{1,2}\s+[A-Za-z]{3,9},?\s+\d{4}|(?<!\d)(?:19|20)\d{2}(?!\d))""",
         ),
     )
     val MONEY = RegexDetector(

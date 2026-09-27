@@ -11,3 +11,9 @@ captures/
 .kotlin/
 bin/
 .vscode/
+
+# Launch video working files: only the finished draft is committed
+brag-output/*
+!brag-output/brag-draft.mp4
+video-assets/
+parda-launch-video-script.md

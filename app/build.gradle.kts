@@ -81,6 +81,9 @@ dependencies {
     // On-device OCR for the image Airlock. The bundled model ships in the APK: nothing is downloaded.
     implementation(libs.mlkit.text.recognition)
     implementation(libs.mlkit.text.recognition.devanagari)
+    // Bundled too: the photo and the QR code on an ID card are not text, and the QR holds all of it.
+    implementation(libs.mlkit.face.detection)
+    implementation(libs.mlkit.barcode.scanning)
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)

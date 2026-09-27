@@ -30,10 +30,13 @@
     <string name="cat_dob">పుట్టిన తేదీలు</string>
     <string name="cat_health_id">ఆరోగ్య రికార్డ్ ఐడీలు</string>
     <string name="cat_condition">వ్యాధులు, నిర్ధారణలు</string>
+    <string name="cat_face">ముఖ చిత్రాలు</string>
+    <string name="cat_qr">QR కోడ్‌లు, బార్‌కోడ్‌లు</string>
     <string name="disc_block">పూర్తిగా ఆపండి</string>
     <string name="disc_surrogate">ప్లేస్‌హోల్డర్‌తో మార్చండి</string>
     <string name="disc_last4">చివరి 4 తప్ప దాచండి</string>
     <string name="disc_allow">వెళ్ళనివ్వండి</string>
+    <string name="disc_stand_in">నిజంలా కనిపించే నకిలీతో మార్చు</string>
     <string name="co_auto">ఆటోమేటిక్‌గా తీసేయండి</string>
     <string name="co_ask">నన్ను అడగండి</string>
     <string name="co_flag">చెప్పండి చాలు</string>

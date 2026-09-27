@@ -9,11 +9,15 @@ composeBom = "2024.12.01"
 junit = "4.13.2"
 pdfbox = "2.0.27.0"
 mlkitText = "16.0.1"
+mlkitFace = "16.1.7"
+mlkitBarcode = "17.3.0"
 
 [libraries]
 pdfbox-android = { module = "com.tom-roush:pdfbox-android", version.ref = "pdfbox" }
 mlkit-text-recognition = { module = "com.google.mlkit:text-recognition", version.ref = "mlkitText" }
 mlkit-text-recognition-devanagari = { module = "com.google.mlkit:text-recognition-devanagari", version.ref = "mlkitText" }
+mlkit-face-detection = { module = "com.google.mlkit:face-detection", version.ref = "mlkitFace" }
+mlkit-barcode-scanning = { module = "com.google.mlkit:barcode-scanning", version.ref = "mlkitBarcode" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "serialization" }
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "coreKtx" }
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activityCompose" }

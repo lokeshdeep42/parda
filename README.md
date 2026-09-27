@@ -44,7 +44,8 @@ app/    Android (Kotlin, Jetpack Compose), "Frost" design direction.
   service/     CheckoutWatchService (AccessibilityService), ScreenSnapshot, InterceptActivity
   ProcessTextActivity   "Mask with Parda" in any app's text-selection menu, replaces in place
   ui/screens/  Home, Firewall (policy), Airlock (Channel B), Ledger, Onboarding
-index.html   The original single-file web prototype of both channels.
+index.html   Single-file web prototype of both channels in the Frost design, running a JS port
+             of :core. Open index.html#selftest to run its checks, #go=store,apply,home to jump.
 ```
 
 ## Build

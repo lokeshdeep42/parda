@@ -2,368 +2,824 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Parda — a local agent that governs what leaves you</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Parda · web prototype</title>
+<meta name="description" content="Parda is an on-device agent that guards what leaves your phone: your money at checkout and your data when you share. Single-file web prototype in the Frost design.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root{
-  --inside:#F4F2ED;      /* warm: on the device */
-  --outside:#DFE1E3;     /* cold: beyond the boundary */
-  --ink:#14181C;
-  --ink-2:#4C555E;
-  --line:#C9CCC6;
-  --gate:#C9412A;        /* the boundary */
-  --cleared:#2F6B4F;
-  --held:#8A5A12;
-  --panel:#FBFAF7;
+  --bg:#DDE2EA;
+  --store:#F4F4F2;
+  --ink:#16181D;
+  --ink-2:#555B66;
+  --ink-3:#6B707A;
+  --dark:#1C1E24;
+  --on-dark:#B4B8C2;
+  --glass:rgba(255,255,255,.55);
+  --glass-edge:rgba(255,255,255,.75);
+  --row:rgba(255,255,255,.8);
+  --hair:rgba(22,24,29,.06);
+  --shadow:0 10px 30px rgba(40,50,70,.08);
+  --blue:#AFC3F2;
+  --peach:#F2CDBE;
+  --ok:#1F9D55;
+  --ok-text:#17804A;
+  --warn-bg:#FFF1CC;
+  --warn:#7A5A00;
+  --p-addon:#8FB4F5;
+  --p-urgency:#F2D36B;
+  --p-fee:#F4AE7A;
+  --p-shame:#EE7F7F;
+  --p-sub:#B7A6EE;
+  --mono:ui-monospace,"SF Mono","JetBrains Mono",Menlo,Consolas,monospace;
+  --spring:cubic-bezier(.2,.9,.25,1);
 }
 *{box-sizing:border-box}
+html,body{margin:0;height:100%}
 body{
-  margin:0;background:var(--inside);color:var(--ink);
-  font-family:Inter,system-ui,sans-serif;font-size:15px;line-height:1.55;
-  -webkit-font-smoothing:antialiased;
+  background:var(--bg);color:var(--ink);
+  font-family:Manrope,"Helvetica Neue",system-ui,sans-serif;
+  -webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent;
 }
-.wrap{max-width:1200px;margin:0 auto;padding:0 20px 70px}
-h1,h2,h3{font-family:"Space Grotesk",sans-serif;margin:0}
-
-/* masthead */
-header.top{padding:26px 0 16px;border-bottom:3px solid var(--gate);margin-bottom:24px;
-  display:flex;flex-wrap:wrap;gap:20px;align-items:flex-end;justify-content:space-between}
-header.top h1{font-size:34px;font-weight:700;letter-spacing:-0.02em}
-header.top p{margin:6px 0 0;max-width:58ch;color:var(--ink-2);font-size:14px}
-.badge{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--ink-2);text-align:right;line-height:1.7}
-.badge b{color:var(--gate)}
-
-/* egress receipt */
-.receipt{display:flex;flex-wrap:wrap;gap:26px;align-items:center;
-  background:var(--ink);color:#fff;padding:11px 16px;margin-bottom:18px}
-.receipt .rk{font-family:"IBM Plex Mono",monospace;font-size:10.5px;
-  letter-spacing:0.1em;text-transform:uppercase;color:#8F99A2;display:block}
-.receipt .rv{font-family:"IBM Plex Mono",monospace;font-size:15px;font-weight:600;color:#fff}
-.receipt .rv.absent{color:var(--gate)}
-.receipt .rn{flex:1;min-width:240px;font-size:11.5px;color:#A9B2BA;line-height:1.45}
-
-/* channel tabs */
-.tabs{display:flex;gap:0;margin-bottom:22px;border-bottom:1px solid var(--line)}
-.tab{font:inherit;font-weight:600;font-size:14px;background:none;border:none;
-  padding:11px 18px;cursor:pointer;color:var(--ink-2);border-bottom:3px solid transparent;margin-bottom:-1px}
-.tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--gate)}
-.tab:hover{color:var(--ink)}
-
-/* the boundary layout */
-.boundary{display:grid;grid-template-columns:1fr 3px 1fr;gap:0;align-items:stretch}
-@media(max-width:920px){.boundary{grid-template-columns:1fr}.gateline{display:none}}
-.side{padding:18px}
-.side.in{background:var(--panel);border:1px solid var(--line);border-right:none}
-.side.out{background:var(--outside);border:1px solid var(--line);border-left:none}
-@media(max-width:920px){
-  .side.in{border-right:1px solid var(--line);border-bottom:3px solid var(--gate)}
-  .side.out{border-left:1px solid var(--line)}
-}
-.gateline{background:var(--gate);position:relative}
-.gateline::after{
-  content:"GATE";position:absolute;top:50%;left:50%;
-  transform:translate(-50%,-50%) rotate(90deg);
-  font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:0.25em;
-  color:var(--gate);background:var(--inside);padding:5px 8px;white-space:nowrap;
-}
-.side h3{font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:var(--ink-2);margin-bottom:12px}
-
-/* generic bits */
-textarea,select{width:100%;font:inherit;border:1px solid var(--line);border-radius:2px;
-  padding:10px;background:#fff;color:var(--ink);font-size:13.5px}
-textarea{min-height:150px;resize:vertical;font-family:"IBM Plex Mono",monospace;font-size:12.5px;line-height:1.65}
-button.act{font:inherit;font-weight:600;font-size:14px;background:var(--ink);color:#fff;
-  border:none;border-radius:2px;padding:10px 18px;cursor:pointer}
-button.act:hover{background:#000}
-button.act:disabled{opacity:.4;cursor:not-allowed}
-button.mini{font:inherit;font-size:12.5px;font-weight:600;background:#fff;color:var(--ink);
-  border:1px solid var(--ink);border-radius:2px;padding:5px 11px;cursor:pointer}
-button.mini:hover{background:var(--ink);color:#fff}
-.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:12px}
-:focus-visible{outline:2px solid var(--gate);outline-offset:2px}
-.hint{font-size:12.5px;color:var(--ink-2);margin-top:8px}
-.mono{font-family:"IBM Plex Mono",monospace;font-size:12.5px}
-
-/* findings */
-.finding{border:1px solid var(--line);background:#fff;border-radius:2px;padding:10px 12px;margin-bottom:8px}
-.finding .ft{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
-.finding .code{font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--ink-2)}
-.finding .name{font-weight:600;font-size:13.5px}
-.finding .why{font-size:12.5px;color:var(--ink-2);margin-top:3px}
-.finding .cost{font-family:"IBM Plex Mono",monospace;font-weight:600;color:var(--gate);font-size:13px}
-.finding.fixed{opacity:.55}
-.finding.fixed .cost{color:var(--cleared);text-decoration:line-through}
-
-/* payload views */
-.payload{background:#fff;border:1px solid var(--line);padding:12px;font-family:"IBM Plex Mono",monospace;
-  font-size:12.5px;line-height:1.75;white-space:pre-wrap;word-break:break-word;max-height:280px;overflow:auto}
-mark.pii{background:#F6E3C8;color:#6B4408;padding:0 2px;border-radius:2px}
-mark.sur{background:#D9E7DE;color:var(--cleared);padding:0 2px;border-radius:2px;font-weight:600}
-
-/* verdict strip */
-.verdict{border:2px solid var(--ink);padding:11px 14px;margin-bottom:14px;display:flex;
-  gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap}
-.verdict.local{border-color:var(--cleared);background:#E7F0EA}
-.verdict.escalate{border-color:var(--held);background:#FBF2DF}
-.verdict .big{font-family:"Space Grotesk",sans-serif;font-weight:700;font-size:16px}
-.verdict .sm{font-size:12.5px;color:var(--ink-2)}
-
-/* checkout mock */
-.cart{background:#fff;border:1px solid var(--line);padding:14px}
-.li{display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid #EFEFEA;font-size:13.5px}
-.li:last-of-type{border-bottom:none}
-.li .lbl{display:flex;gap:8px;align-items:flex-start}
-.li input[type=checkbox]{margin-top:3px;accent-color:var(--gate);width:15px;height:15px}
-.li .amt{font-family:"IBM Plex Mono",monospace;white-space:nowrap}
-.li.sneak{background:#FBF2DF;margin:0 -14px;padding:7px 14px}
-.total{display:flex;justify-content:space-between;border-top:2px solid var(--ink);
-  margin-top:10px;padding-top:9px;font-weight:700;font-size:15px}
-.total .amt{font-family:"IBM Plex Mono",monospace}
-.urgency{font-size:12px;color:var(--gate);font-weight:600;margin-top:9px}
-.guilt{font-size:12px;color:var(--ink-2);font-style:italic;margin-top:5px}
-
-/* policy */
-.policy{margin-top:22px;border:1px solid var(--line);background:var(--panel);padding:16px}
-.policy h3{font-size:13px;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);margin-bottom:10px}
-.prule{display:flex;gap:10px;align-items:center;padding:7px 0;border-bottom:1px solid #EDEDE7;font-size:13.5px}
-.prule:last-child{border-bottom:none}
-.prule select{width:auto;padding:4px 8px;font-size:12.5px}
-.prule .pk{font-family:"IBM Plex Mono",monospace;font-size:12.5px;min-width:190px}
-
-/* ledger */
-.ledger{margin-top:22px;border:1px solid var(--line);background:var(--panel);padding:16px}
-.ledger h3{font-size:13px;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);margin-bottom:4px}
-.ledger > p{margin:0 0 12px;font-size:12.5px;color:var(--ink-2)}
-.lentry{display:grid;grid-template-columns:78px 92px 1fr;gap:12px;padding:8px 0;
-  border-bottom:1px solid #EDEDE7;font-size:13px;align-items:baseline}
-.lentry:last-child{border-bottom:none}
-.lentry .t{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--ink-2)}
-.lentry .v{font-family:"IBM Plex Mono",monospace;font-size:10.5px;font-weight:600;padding:2px 6px;text-align:center}
-.v.blocked{background:#F6DED9;color:var(--gate)}
-.v.local{background:#D9E7DE;color:var(--cleared)}
-.v.released{background:#FBF0DA;color:var(--held)}
-.v.fixed{background:#D9E7DE;color:var(--cleared)}
-.empty{color:var(--ink-2);font-size:13px;padding:6px 0}
-
-footer{margin-top:34px;padding-top:14px;border-top:1px solid var(--line);
-  font-size:12.5px;color:var(--ink-2)}
-code{font-family:"IBM Plex Mono",monospace;font-size:12px;background:#E9E9E3;padding:1px 4px}
+button,input,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--dark);outline-offset:2px}
 [hidden]{display:none !important}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* ---------- stage: presenter rail + phone ---------- */
+.stage{min-height:100dvh;display:flex;align-items:center;justify-content:center;gap:64px;padding:24px;position:relative;overflow:hidden}
+.stage::before,.stage::after{content:"";position:absolute;border-radius:50%;pointer-events:none;filter:blur(90px)}
+.stage::before{width:520px;height:520px;background:var(--blue);opacity:.45;top:-160px;left:-120px}
+.stage::after{width:460px;height:460px;background:var(--peach);opacity:.5;bottom:-160px;right:-80px}
+
+.rail{position:relative;z-index:1;width:330px;display:flex;flex-direction:column;gap:22px}
+.rail .mark{display:flex;align-items:center;gap:10px;font-weight:800;font-size:26px;letter-spacing:-.02em}
+.rail .lede{margin:0;font-size:15px;line-height:1.5;color:var(--ink-2)}
+.rail .lede b{color:var(--ink);font-weight:700}
+.receipt{background:var(--dark);color:#fff;border-radius:22px;padding:16px 18px;display:grid;grid-template-columns:1fr 1fr;gap:10px 14px}
+.receipt .k{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--on-dark);font-weight:600}
+.receipt .v{font-size:18px;font-weight:700;letter-spacing:-.01em}
+.receipt .n{grid-column:1/-1;font-size:12px;line-height:1.45;color:#D5D8DE}
+.steps{list-style:none;margin:0;padding:6px;border-radius:24px;background:var(--glass);border:1px solid var(--glass-edge)}
+.steps button{width:100%;display:flex;align-items:center;gap:12px;padding:9px 10px;border:0;border-radius:16px;background:transparent;text-align:left;font-size:14px;font-weight:600}
+.steps button:hover{background:rgba(255,255,255,.7)}
+.steps .num{width:26px;height:26px;flex-shrink:0;border-radius:50%;background:rgba(255,255,255,.9);display:grid;place-items:center;font-size:12px;font-weight:700}
+.rail .foot{font-size:12px;line-height:1.5;color:var(--ink-2)}
+.rail .foot b{color:var(--ink)}
+
+.phone{position:relative;z-index:1;width:390px;height:min(844px,calc(100dvh - 48px));flex-shrink:0;border-radius:52px;overflow:hidden;background:var(--bg);
+  box-shadow:0 0 0 10px #15171C,0 0 0 11px #3A3E47,0 40px 90px rgba(20,25,35,.35)}
+@media (max-width:980px){.rail{display:none}}
+@media (max-width:520px){
+  .stage{padding:0}
+  .stage::before,.stage::after{display:none}
+  .phone{width:100vw;height:100dvh;border-radius:0;box-shadow:none}
+}
+
+/* ---------- phone chrome ---------- */
+.statusbar{position:absolute;top:0;left:0;right:0;height:46px;z-index:50;display:flex;align-items:center;justify-content:space-between;padding:4px 30px 0;font-size:15px;font-weight:700;pointer-events:none}
+.statusbar .icons{display:flex;gap:6px;align-items:center}
+.screen{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;scrollbar-width:none;background:var(--bg)}
+.screen::-webkit-scrollbar{display:none}
+.screen.store-bg{background:var(--store)}
+.screen:focus{outline:none}
+.overlay.still .scrim,.overlay.still .sheet{animation:none}
+.blob{position:absolute;border-radius:50%;pointer-events:none;z-index:0}
+.content{position:relative;z-index:1;padding:58px 20px 132px;display:flex;flex-direction:column;gap:16px;min-height:100%}
+.enter{animation:rise .38s var(--spring) both}
+@keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+
+.dock{position:absolute;left:50%;bottom:26px;transform:translateX(-50%);z-index:40;display:flex;gap:8px;padding:8px;border-radius:999px;
+  background:rgba(255,255,255,.6);border:1px solid rgba(255,255,255,.8);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);box-shadow:0 8px 24px rgba(40,50,70,.12)}
+.dock button{width:52px;height:52px;border-radius:50%;border:0;background:transparent;display:grid;place-items:center;color:var(--ink);transition:background .2s,color .2s}
+.dock button[aria-current="page"]{background:var(--dark);color:#fff}
+
+.toast{position:absolute;top:54px;left:50%;z-index:80;transform:translate(-50%,-8px);opacity:0;pointer-events:none;
+  max-width:calc(100% - 40px);width:max-content;padding:11px 16px;border-radius:18px;background:var(--dark);color:#fff;font-size:13px;font-weight:600;line-height:1.4;
+  box-shadow:0 10px 30px rgba(20,25,35,.25);transition:opacity .25s,transform .35s var(--spring)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+/* ---------- shared components ---------- */
+.title{margin:0;font-size:34px;line-height:1.08;font-weight:700;letter-spacing:-.03em}
+.subtitle{font-size:14px;color:var(--ink-2);margin-top:2px}
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.brand{display:flex;align-items:center;gap:8px;font-weight:800;font-size:20px;letter-spacing:-.02em}
+.icon-btn{width:46px;height:46px;flex-shrink:0;border-radius:50%;border:1px solid rgba(255,255,255,.8);background:var(--glass);display:grid;place-items:center;color:var(--ink)}
+.icon-btn:active,.btn:active,.pill:active{transform:scale(.97)}
+.gap8{display:flex;gap:8px}
+.card{padding:20px;border-radius:28px;display:flex;flex-direction:column;gap:16px}
+.glass{background:var(--glass);border:1px solid var(--glass-edge);box-shadow:var(--shadow)}
+.dark{background:var(--dark);color:#fff}
+.list{border-radius:26px;background:var(--glass);border:1px solid var(--glass-edge);overflow:hidden}
+.list .item{display:flex;align-items:center;gap:12px;padding:14px 16px;border-bottom:1px solid var(--hair);width:100%;background:none;border-left:0;border-right:0;border-top:0;text-align:left}
+.list .item:last-child{border-bottom:0}
+.grow{flex:1;min-width:0}
+.t15{font-size:15px;font-weight:700;line-height:1.3}
+.t15m{font-size:15px;font-weight:600;line-height:1.3}
+.t13{font-size:13px;font-weight:500;color:var(--ink-2);line-height:1.4}
+.t12{font-size:12px;color:var(--ink-2);line-height:1.4}
+.eyebrow{font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--on-dark)}
+.section-label{font-size:14px;font-weight:700;padding-left:4px;margin-top:4px}
+.dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.circle44{width:44px;height:44px;flex-shrink:0;border-radius:50%;background:rgba(255,255,255,.9);display:grid;place-items:center}
+.btn{height:56px;border-radius:999px;border:0;background:var(--dark);color:#fff;font-size:16px;font-weight:700;width:100%;display:flex;align-items:center;justify-content:center;gap:10px;transition:transform .15s,opacity .2s}
+.btn:disabled{opacity:.45;cursor:default}
+.btn.ghost{height:44px;background:transparent;color:var(--ink);font-size:15px;font-weight:600}
+.btn.sm{height:46px;font-size:15px}
+.pill{height:36px;padding:0 14px;border-radius:999px;border:0;background:var(--dark);color:#fff;font-size:13px;font-weight:700;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;transition:transform .15s}
+.pill.light{background:rgba(255,255,255,.92);color:var(--ink)}
+.pill.glassy{background:rgba(255,255,255,.6);border:1px solid rgba(255,255,255,.8);color:var(--ink)}
+.pill.outline-dark{background:transparent;border:1px solid rgba(255,255,255,.3);color:#fff}
+.chip{padding:6px 10px;border-radius:999px;font-size:12px;font-weight:700;white-space:nowrap;border:0;background:rgba(255,255,255,.9);color:var(--ink)}
+.chip.on{background:var(--dark);color:#fff}
+.chip.warn{background:var(--warn-bg);color:var(--warn)}
+.chip.ok{background:rgba(31,157,85,.12);color:var(--ok-text)}
+button.chip{cursor:pointer;transition:background .2s,color .2s}
+.seg{display:flex;padding:4px;border-radius:999px;background:rgba(255,255,255,.5);border:1px solid var(--glass-edge)}
+.seg button{flex:1;height:40px;border-radius:999px;border:0;background:transparent;font-size:14px;font-weight:600;color:var(--ink-2)}
+.seg button[aria-selected="true"]{background:#fff;color:var(--ink);font-weight:700;box-shadow:0 2px 8px rgba(40,50,70,.08)}
+input[type=checkbox]{width:22px;height:22px;accent-color:var(--dark);flex-shrink:0;margin:0;cursor:pointer}
+.mono{font-family:var(--mono)}
+.okline{display:flex;align-items:center;gap:8px;padding:7px 12px;border-radius:999px;background:rgba(255,255,255,.8);font-size:13px;font-weight:600;width:max-content}
+.okline .dot{width:8px;height:8px;background:var(--ok)}
+textarea.field,input.field{width:100%;border:1px solid rgba(255,255,255,.9);background:var(--row);border-radius:20px;padding:14px 16px;font-size:13.5px;line-height:1.6;resize:vertical;outline:none}
+textarea.field{min-height:150px;font-family:var(--mono);font-size:12.5px}
+textarea.field:focus,input.field:focus{border-color:var(--dark)}
+mark{border-radius:5px;padding:0 3px}
+mark.tok{background:rgba(175,195,242,.28);color:#D3DFFB;font-weight:700}
+mark.blk{background:rgba(238,127,127,.28);color:#F7BDBD;font-weight:700}
+mark.l4{background:rgba(242,211,107,.25);color:#F5DF95;font-weight:700}
+mark.back{background:rgba(31,157,85,.14);color:var(--ok-text);font-weight:700}
+mark.pii{background:var(--warn-bg);color:var(--warn);font-weight:700}
+pre.block{margin:0;white-space:pre-wrap;word-break:break-word;font-family:var(--mono);font-size:12.5px;line-height:1.7}
+.inner{background:var(--row);border-radius:20px;padding:14px 16px}
+
+/* ---------- welcome ---------- */
+.welcome .content{padding-bottom:30px;gap:18px}
+.appicon{align-self:center;width:88px;height:88px;border-radius:30px;background:rgba(255,255,255,.6);border:1px solid rgba(255,255,255,.85);display:grid;place-items:center;box-shadow:0 10px 30px rgba(40,50,70,.10);margin-top:8px}
+.center{text-align:center;display:flex;flex-direction:column;gap:8px}
+.welcome h1{margin:0;font-size:28px;line-height:1.1;font-weight:700;letter-spacing:-.03em}
+.welcome .center p{margin:0;font-size:15px;line-height:1.45;color:var(--ink-2)}
+.perm{display:flex;align-items:center;gap:12px;padding:14px;border-radius:22px;background:rgba(255,255,255,.6);border:1px solid rgba(255,255,255,.8)}
+.perm .on{display:flex;align-items:center;gap:4px;font-size:13px;font-weight:700;color:var(--ok-text)}
+.darknote{display:flex;align-items:center;gap:14px;padding:16px 18px;border-radius:22px;background:var(--dark);color:#D5D8DE;font-size:13px;line-height:1.45}
+.darknote b{color:#fff}
+.darknote svg,.card > svg{flex-shrink:0}
+.cta{margin-top:auto;display:flex;flex-direction:column;align-items:center;gap:14px;padding-top:8px}
+.dots{display:flex;gap:6px}
+.dots span{width:6px;height:6px;border-radius:99px;background:rgba(22,24,29,.25);transition:width .3s var(--spring),background .3s}
+.dots span.on{width:22px;background:var(--dark)}
+
+/* ---------- home ---------- */
+.stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px 12px}
+.stat .v{font-size:28px;font-weight:700;letter-spacing:-.02em;line-height:1.15}
+.stat .k{font-size:13px;color:var(--ink-2)}
+.pbar{display:flex;gap:4px;height:8px}
+.pbar span{border-radius:99px;min-width:8px}
+.legend{display:flex;flex-wrap:wrap;gap:6px 12px;font-size:11.5px;color:var(--ink-2);font-weight:600}
+.legend i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;vertical-align:0}
+.intercept{padding:20px;border-radius:28px;background:var(--dark);color:#fff;display:flex;align-items:center;gap:14px}
+.intercept .h{font-size:18px;font-weight:700;line-height:1.25;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.intercept .s{font-size:13px;color:var(--on-dark)}
+.intercept .amt{font-size:18px;font-weight:700}
+.go-white{width:52px;height:52px;border-radius:50%;border:0;background:#fff;color:var(--dark);display:grid;place-items:center;flex-shrink:0}
+.rowcard{padding:14px 16px;border-radius:22px;background:rgba(255,255,255,.5);border:1px solid rgba(255,255,255,.7);display:flex;align-items:center;gap:12px;width:100%;text-align:left}
+
+/* ---------- store (the app being watched) ---------- */
+.store .content{padding:58px 22px 40px;gap:14px}
+.store-top{display:flex;align-items:center;gap:12px}
+.back{width:40px;height:40px;border-radius:50%;border:1px solid #E3E4E1;background:#fff;display:grid;place-items:center;color:var(--ink);flex-shrink:0}
+.store-name{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3)}
+.store h2{margin:0;font-size:22px;font-weight:700}
+.carts{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;margin:0 -22px;padding:2px 22px}
+.carts::-webkit-scrollbar{display:none}
+.carts button{flex-shrink:0;height:34px;padding:0 12px;border-radius:999px;border:1px solid #E1E2DF;background:#fff;font-size:12.5px;font-weight:600;color:var(--ink-2)}
+.carts button[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:#fff}
+.sline{display:flex;justify-content:space-between;align-items:center;gap:12px;font-size:15px;min-height:26px}
+.sline label{display:flex;align-items:center;gap:10px;cursor:pointer}
+.sline input[type=checkbox]{width:18px;height:18px;accent-color:#2E6BE6}
+.sline .price{white-space:nowrap;font-variant-numeric:tabular-nums}
+.sline.fee .lbl{color:var(--ink-2)}
+.stotal{display:flex;justify-content:space-between;font-size:17px;font-weight:700;padding-top:12px;border-top:1px solid #DADCE0}
+.banner{align-self:center;padding:8px 14px;border-radius:999px;background:#FDE7E2;color:#A1321A;font-size:13px;font-weight:600;text-align:center}
+.paybtn{height:52px;border-radius:14px;border:0;background:#2E6BE6;color:#fff;font-size:16px;font-weight:700;width:100%}
+.decline{align-self:center;background:none;border:0;font-size:12.5px;color:var(--ink-3);text-decoration:underline;text-underline-offset:3px}
+.watchcap{align-self:center;display:flex;align-items:center;gap:8px;padding:8px 14px;border-radius:999px;background:rgba(255,255,255,.92);border:1px solid #E6E7EA;box-shadow:0 6px 18px rgba(40,50,70,.08);font-size:12.5px;font-weight:700;border-width:1px}
+.watchcap .pulse{width:8px;height:8px;border-radius:50%;background:var(--ok);animation:pulse 1s ease-in-out infinite}
+@keyframes pulse{50%{opacity:.25}}
+.storenote{font-size:12px;color:var(--ink-3);text-align:center;line-height:1.45}
+
+/* ---------- intercept sheet ---------- */
+.overlay{position:absolute;inset:0;z-index:60}
+.scrim{position:absolute;inset:0;background:rgba(30,34,44,.28);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);animation:fade .3s both}
+@keyframes fade{from{opacity:0}}
+.sheet{position:absolute;left:10px;right:10px;bottom:10px;max-height:calc(100% - 56px);display:flex;flex-direction:column;gap:14px;padding:12px 20px 18px;border-radius:36px;
+  background:rgba(255,255,255,.72);border:1px solid rgba(255,255,255,.9);backdrop-filter:blur(30px);-webkit-backdrop-filter:blur(30px);box-shadow:0 -10px 40px rgba(20,25,35,.18);
+  animation:sheetUp .5s var(--spring) both}
+@keyframes sheetUp{from{transform:translateY(105%)}}
+.grabber{align-self:center;width:40px;height:5px;border-radius:99px;background:rgba(22,24,29,.2);flex-shrink:0}
+.sheet-head{display:flex;align-items:center;gap:12px}
+.sheet-icon{width:48px;height:48px;border-radius:16px;background:var(--dark);color:#fff;display:grid;place-items:center;flex-shrink:0}
+.sheet-title{font-size:20px;font-weight:700;letter-spacing:-.02em;line-height:1.2}
+.sheet-rows{display:flex;flex-direction:column;gap:8px;overflow-y:auto;scrollbar-width:none;min-height:60px}
+.srow{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:20px;background:var(--row)}
+.srow .amt{font-size:15px;font-weight:700;white-space:nowrap;font-variant-numeric:tabular-nums}
+.srow .tag{font-size:10.5px;font-weight:700;letter-spacing:.05em;color:var(--ink-3)}
+.srow.auto{box-shadow:inset 0 0 0 1.5px rgba(28,30,36,.14)}
+.youpay{display:flex;align-items:baseline;gap:10px;padding:0 4px}
+.youpay .k{font-size:14px;color:var(--ink-2);flex:1}
+.youpay .old{font-size:15px;color:var(--ink-3);text-decoration:line-through}
+.youpay .new{font-size:30px;font-weight:800;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.recur{margin:-6px 4px 0;font-size:12.5px;font-weight:600;color:var(--ink-2)}
+.recur b{color:var(--ok-text)}
+
+/* ---------- firewall + ledger ---------- */
+.rule .code{font-size:10.5px;font-weight:700;letter-spacing:.05em;color:var(--ink-3)}
+.apps{display:flex;flex-wrap:wrap;gap:8px}
+.apps button{padding:9px 14px;border-radius:999px;background:rgba(255,255,255,.6);border:1px solid rgba(255,255,255,.8);font-size:13px;font-weight:600;display:inline-flex;align-items:center;gap:6px}
+.apps button[aria-pressed="false"]{background:transparent;color:var(--ink-3);text-decoration:line-through}
+.apps .add{border:1px dashed rgba(22,24,29,.35);background:transparent}
+.addrow{display:flex;gap:8px}
+.addrow input{height:44px;border-radius:999px;padding:0 16px;font-size:14px}
+.chain{display:flex;align-items:center;gap:12px}
+.chain .grow{flex:1}
+.lg-icon{width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.9);display:grid;place-items:center;flex-shrink:0}
+.lg-meta{font-size:11.5px;color:var(--ink-3);font-weight:600;margin-top:3px}
+.lg-right{font-size:14px;font-weight:700;white-space:nowrap}
+.vchip{font-size:10.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;padding:3px 7px;border-radius:99px;background:rgba(22,24,29,.07);color:var(--ink-2)}
+.vchip.fixed,.vchip.held{background:rgba(31,157,85,.12);color:var(--ok-text)}
+.vchip.handed{background:var(--warn-bg);color:var(--warn)}
+.vchip.flagged,.vchip.kept{background:rgba(238,127,127,.16);color:#A33A3A}
+.empty{padding:22px 18px;text-align:center;font-size:13.5px;color:var(--ink-2);line-height:1.5}
+
+/* ---------- airlock ---------- */
+.qchips{display:flex;flex-wrap:wrap;gap:8px}
+.ask{display:flex;gap:8px;align-items:center}
+.ask input{flex:1;height:52px;border-radius:999px;padding:0 18px;font-size:14px;font-family:inherit}
+.send{width:52px;height:52px;border-radius:50%;border:0;background:var(--dark);color:#fff;display:grid;place-items:center;flex-shrink:0}
+.found{display:flex;flex-direction:column;gap:6px}
+.found .f{display:flex;align-items:center;gap:10px;font-size:13.5px;font-weight:600}
+.found .f .n{min-width:22px;height:22px;border-radius:99px;background:rgba(22,24,29,.07);display:grid;place-items:center;font-size:11.5px;font-weight:800}
+.found .f .grow{flex:1}
+.plan{font-family:var(--mono);font-size:11.5px;line-height:1.5;padding:10px 12px;border-radius:14px;background:rgba(22,24,29,.05);color:var(--ink-2);word-break:break-all}
+.dark .plan{background:rgba(255,255,255,.07);color:var(--on-dark)}
+.verdict-h{display:flex;align-items:center;gap:8px;font-size:17px;font-weight:700}
+.verdict-h .dot{width:9px;height:9px;background:var(--ok)}
+.dark .muted{color:var(--on-dark)}
+.muted{color:var(--ink-2);font-size:13px;line-height:1.5;margin:0}
+.outbox{background:rgba(255,255,255,.06);border-radius:18px;padding:14px;max-height:220px;overflow:auto;color:#E7E9EE}
+.spinner{width:18px;height:18px;border-radius:50%;border:2.5px solid rgba(22,24,29,.15);border-top-color:var(--dark);animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.idwrap{padding:16px;border-radius:28px;background:rgba(255,255,255,.45);border:1px solid var(--glass-edge);display:flex;flex-direction:column;gap:12px}
+.idcard{padding:16px;border-radius:18px;background:#fff;box-shadow:0 8px 24px rgba(40,50,70,.10);display:flex;flex-direction:column;gap:12px}
+.idcard .top{display:flex;gap:14px}
+.idphoto{width:72px;height:88px;border-radius:10px;background:#E6E9EF;display:grid;place-items:center;flex-shrink:0;color:#8A909B}
+.idf{display:flex;flex-direction:column;gap:9px;flex:1;min-width:0}
+.idf .k{color:var(--ink-3);font-size:10px;letter-spacing:.06em;text-transform:uppercase;font-weight:600}
+.idf .v{font-weight:700;font-size:14px;display:flex;align-items:center;gap:6px;min-height:18px}
+.bar{display:inline-block;height:13px;border-radius:4px;background:var(--dark);transition:width .35s var(--spring)}
+.idhead{display:flex;justify-content:space-between;align-items:center;font-size:10px;font-weight:800;letter-spacing:.08em;color:var(--ink-3)}
+.maskrow{display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--hair);cursor:pointer}
+.maskrow:last-child{border-bottom:0}
+
+/* ---------- vault + settings ---------- */
+.vrow{display:flex;align-items:center;gap:10px;padding:13px 16px;border-bottom:1px solid var(--hair)}
+.vrow:last-child{border-bottom:0}
+.vtok{font-family:var(--mono);font-size:12px;font-weight:700;padding:5px 8px;border-radius:10px;background:rgba(22,24,29,.06);white-space:nowrap}
+.vreal{flex:1;min-width:0;font-size:13.5px;font-weight:600;overflow-wrap:anywhere}
+.switch{position:relative;width:52px;height:32px;border-radius:99px;border:0;background:rgba(22,24,29,.15);flex-shrink:0;transition:background .2s}
+.switch::after{content:"";position:absolute;top:3px;left:3px;width:26px;height:26px;border-radius:50%;background:#fff;box-shadow:0 2px 6px rgba(0,0,0,.15);transition:transform .3s var(--spring)}
+.switch[aria-checked="true"]{background:var(--ok)}
+.switch[aria-checked="true"]::after{transform:translateX(20px)}
+details.gbnf summary{cursor:pointer;font-size:13px;font-weight:700;list-style:none;display:flex;align-items:center;gap:6px}
+details.gbnf summary::-webkit-details-marker{display:none}
+details.gbnf pre{margin:10px 0 0;font-size:10.5px;line-height:1.55;white-space:pre-wrap;word-break:break-all;color:var(--ink-2)}
+
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms !important;animation-iteration-count:1 !important;transition-duration:.01ms !important}
+}
 </style>
 </head>
 <body>
-<div class="wrap">
+<div class="stage">
 
-<header class="top">
-  <div>
-    <h1>Parda</h1>
-    <p>Two things leave your phone without your meaningful consent: your data, and your money. Parda stands at both boundaries under one policy you own — and it holds no network permission, so it cannot transmit anything itself.</p>
-  </div>
-  <div class="badge">
-    <b>TEAM GOLD</b><br>
-    Hammer2.1-1.5B · GBNF-constrained<br>
-    android.permission.INTERNET — not declared
-  </div>
-</header>
-
-<div class="receipt">
-  <div>
-    <span class="rk">Egress this session</span>
-    <span class="rv" id="egress">0 bytes</span>
-  </div>
-  <div>
-    <span class="rk">Network permission</span>
-    <span class="rv absent">not declared</span>
-  </div>
-  <div class="rn">Parda cannot open a socket. Anything that leaves does so through your share sheet, by your own hand.</div>
-</div>
-
-<div class="tabs" role="tablist">
-  <button class="tab" role="tab" id="tab-b" aria-selected="true" aria-controls="ch-b">Channel B — data boundary</button>
-  <button class="tab" role="tab" id="tab-a" aria-selected="false" aria-controls="ch-a">Channel A — money boundary</button>
-</div>
-
-<!-- ================= CHANNEL B ================= -->
-<section id="ch-b" role="tabpanel" aria-labelledby="tab-b">
-  <div id="verdictB"></div>
-  <div class="boundary">
-    <div class="side in">
-      <h3>Inside the device</h3>
-      <textarea id="inputB" aria-label="Text you are about to send"></textarea>
-      <div class="row">
-        <button class="act" id="runB">Ask the agent</button>
-        <button class="mini" id="sampleB">Load a sample</button>
-        <button class="mini" id="hardB">Ask something harder</button>
-      </div>
-      <div class="hint" id="hintB">The agent classifies what's in this text, applies your policy, and decides whether it can answer without anything needing to leave.</div>
-      <div id="foundB" style="margin-top:14px"></div>
-      <div id="vaultB" hidden style="margin-top:14px">
-        <h3>Vault — never transmitted</h3>
-        <div class="payload" id="vaultBody"></div>
-      </div>
+  <aside class="rail" aria-label="About this prototype">
+    <div class="mark"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z"/></svg>parda</div>
+    <p class="lede">Two things leave your phone without real consent: <b>your money</b>, through tricks at checkout, and <b>your data</b>, in the text and photos you share. Parda guards both on the device, under one policy you own.</p>
+    <div class="receipt" aria-label="Egress receipt">
+      <div><div class="k">Sent by Parda</div><div class="v" id="railBytes">0 bytes</div></div>
+      <div><div class="k">INTERNET permission</div><div class="v">not declared</div></div>
+      <div class="n">Parda cannot open a socket. Anything that leaves goes through your share sheet, by your own hand.</div>
     </div>
-    <div class="gateline"></div>
-    <div class="side out">
-      <h3>What Parda hands back to you</h3>
-      <div class="payload" id="outB">Nothing has been handed back.</div>
-      <div class="hint" id="outHintB">This is what lands on your clipboard if you choose to ask an outside model. Parda does not send it — you do, or you don't.</div>
-      <div id="answerB" hidden style="margin-top:14px">
-        <h3>Answer</h3>
-        <div class="payload" id="answerBody"></div>
-      </div>
+    <ol class="steps" aria-label="Demo walkthrough">
+      <li><button data-act="step" data-arg="welcome"><span class="num">1</span>Welcome and permissions</button></li>
+      <li><button data-act="step" data-arg="store"><span class="num">2</span>Open a checkout, see it paused</button></li>
+      <li><button data-act="step" data-arg="ledger"><span class="num">3</span>Firewall and the decision ledger</button></li>
+      <li><button data-act="step" data-arg="hard"><span class="num">4</span>Airlock: a question that needs outside help</button></li>
+      <li><button data-act="step" data-arg="photo"><span class="num">5</span>Airlock: mask an ID photo</button></li>
+      <li><button data-act="step" data-arg="vault"><span class="num">6</span>The vault</button></li>
+      <li><button data-act="step" data-arg="flight"><span class="num">7</span>Flight mode: it all still works</button></li>
+    </ol>
+    <p class="foot"><b>The agent plans and classifies. Deterministic code decides and executes.</b> A wrong model output gives a wrong suggestion, never a wrong disclosure. Team GOLD · iQOO hackathon.</p>
+  </aside>
+
+  <div class="phone" id="phone">
+    <div class="statusbar" aria-hidden="true">
+      <span id="clock">9:41</span>
+      <span class="icons" id="sbIcons"></span>
     </div>
+    <main class="screen" id="screen" tabindex="-1"></main>
+    <nav class="dock" id="dock" aria-label="Main"></nav>
+    <div class="overlay" id="overlay" hidden></div>
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
   </div>
-</section>
-
-<!-- ================= CHANNEL A ================= -->
-<section id="ch-a" role="tabpanel" aria-labelledby="tab-a" hidden>
-  <div id="verdictA"></div>
-  <div class="boundary">
-    <div class="side in">
-      <h3>The checkout screen, as read by the agent</h3>
-      <div class="cart" id="cart"></div>
-      <div class="row">
-        <button class="act" id="runA">Scan this screen</button>
-        <button class="mini" id="resetA">Reset the cart</button>
-      </div>
-      <div class="hint">Read through AccessibilityService in the Android build, with the phone fully online — because that is when you shop. Parda never taps Pay; every fix is offered, never forced.</div>
-    </div>
-    <div class="gateline"></div>
-    <div class="side out">
-      <h3>What the agent found</h3>
-      <div id="foundA"><p class="empty">Scan the screen to see what it is doing to you.</p></div>
-    </div>
-  </div>
-</section>
-
-<!-- ================= POLICY ================= -->
-<div class="policy">
-  <h3>Disclosure policy — yours, on the device</h3>
-  <div id="policyRules"></div>
-  <div class="hint">One policy governs both boundaries. The agent proposes; this policy and the outbound gate decide. Change a rule and re-run either channel.</div>
 </div>
 
-<!-- ================= LEDGER ================= -->
-<div class="ledger">
-  <h3>Decision ledger</h3>
-  <p>Append-only. Every decision at either boundary, whether or not anything was handed back.</p>
-  <div id="ledgerBody"><p class="empty">No decisions recorded yet.</p></div>
-  <div class="row"><button class="mini" id="clearLedger">Clear</button></div>
-</div>
-
-<footer>
-  Team GOLD · The agent plans and classifies. Deterministic code decides and executes. A wrong model output produces a wrong suggestion, never a wrong disclosure — and with no network permission declared, Parda has no way to disclose anything itself.
-</footer>
-</div>
+<script type="text/plain" id="gbnf">root     ::= "{" ws "\"name\"" ws ":" ws call "}"
+call     ::= local | handback
+local    ::= "\"answer_locally\"" ws "," ws "\"arguments\"" ws ":" ws "{" ws "\"task\"" ws ":" ws task ws "}" ws
+handback ::= "\"hand_back\"" ws "," ws "\"arguments\"" ws ":" ws "{" ws "\"reason\"" ws ":" ws reason ws "}" ws
+task     ::= "\"summarise\"" | "\"extract\"" | "\"rewrite\""
+reason   ::= "\"needs_outside_knowledge\"" | "\"too_complex\""
+ws       ::= [ \t\n]*</script>
 
 <script>
 "use strict";
-const $=id=>document.getElementById(id);
+/* Parda web prototype. The logic below is a port of the Kotlin :core module
+   (policy, detectors, sanitizer + vault, rule-based agent, dark-pattern scanner,
+   hash-chained ledger). The screens follow the Frost design. */
 
-/* ===================== POLICY ENGINE ===================== */
-const POLICY=[
-  {key:"gov_id",        label:"Government ID numbers",   act:"block"},
-  {key:"bank_account",  label:"Bank / card numbers",     act:"block"},
-  {key:"person_name",   label:"Personal names",          act:"surrogate"},
-  {key:"money_amount",  label:"Salary and amounts",      act:"surrogate"},
-  {key:"phone",         label:"Phone numbers",           act:"surrogate"},
-  {key:"email",         label:"Email addresses",         act:"surrogate"},
-  {key:"address",       label:"Addresses",               act:"surrogate"},
-  {key:"dark_pattern",  label:"Dark patterns at checkout", act:"flag"}
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+/* ============================== ICONS ============================== */
+const SHIELD = '<path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z"/>';
+const ICONS = {
+  shield: SHIELD,
+  shieldCheck: SHIELD + '<path d="M9 12l2 2 4-4"/>',
+  shieldAlert: SHIELD + '<path d="M12 8v5M12 16v.5"/>',
+  home: '<path d="M4 11l8-7 8 7v9h-5v-6h-6v6H4z"/>',
+  lock: '<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/>',
+  sliders: '<path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/>',
+  bell: '<path d="M6 16v-5a6 6 0 0112 0v5l2 2H4z"/><path d="M10 21a2 2 0 004 0"/>',
+  user: '<circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/>',
+  eye: '<path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+  photo: '<rect x="3" y="5" width="18" height="14" rx="3"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-8 8"/>',
+  chip: '<rect x="7" y="7" width="10" height="10" rx="2"/><path d="M10 3v4M14 3v4M10 17v4M14 17v4M3 10h4M3 14h4M17 10h4M17 14h4"/>',
+  chevR: '<path d="M9 6l6 6-6 6"/>',
+  chevL: '<path d="M15 6l-6 6 6 6"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  copy: '<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 012-2h9"/>',
+  download: '<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>',
+  share: '<path d="M12 15V4M8 8l4-4 4 4"/><path d="M5 12v6a2 2 0 002 2h10a2 2 0 002-2v-6"/>',
+  arrow: '<path d="M5 12h14M13 6l6 6-6 6"/>',
+  key: '<circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M17 6l3 3M15 8l2 2"/>',
+  doc: '<path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M10 13h6M10 17h6"/>',
+  cart: '<path d="M3 4h2l2.4 11h10.2L20 7H6.2"/><circle cx="9" cy="19" r="1.5"/><circle cx="17" cy="19" r="1.5"/>',
+  check: '<path d="M5 12l4 4 10-10"/>',
+  refresh: '<path d="M20 11a8 8 0 10-2.3 5.7M20 5v6h-6"/>',
+  list: '<path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/>',
+  plane: '<path d="M17.8 19.2L16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/>',
+  link: '<path d="M10 14a4 4 0 005.7 0l3-3a4 4 0 00-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 00-5.7 0l-3 3a4 4 0 005.7 5.7l1-1"/>',
+};
+function icon(name, size = 20, sw = 1.8) {
+  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name]}</svg>`;
+}
+
+/* ============================== POLICY ============================== */
+const CATEGORIES = {
+  GOV_ID:        {label: "Government ID numbers", short: "Government ID", hint: "Aadhaar, PAN",            prefix: "GOVID"},
+  CARD:          {label: "Card numbers",          short: "Card number",   hint: "Checked with Luhn",       prefix: "CARD"},
+  BANK_ACCOUNT:  {label: "Bank account numbers",  short: "Account",       hint: "9 to 18 digits",          prefix: "ACCT"},
+  PERSON_NAME:   {label: "Personal names",        short: "Name",          hint: "Mr, Smt, Name:, Dear",    prefix: "PERSON"},
+  MONEY_AMOUNT:  {label: "Salary and amounts",    short: "Amount",        hint: "₹, Rs, INR, lakh, LPA",   prefix: "AMOUNT"},
+  PHONE:         {label: "Phone numbers",         short: "Phone",         hint: "+91 mobile numbers",      prefix: "PHONE"},
+  EMAIL:         {label: "Email addresses",       short: "Email",         hint: "Any address",             prefix: "EMAIL"},
+  ADDRESS:       {label: "Addresses",             short: "Address",       hint: "Lines ending in a PIN",   prefix: "ADDRESS"},
+  DATE_OF_BIRTH: {label: "Dates of birth",        short: "Date of birth", hint: "DOB, born on",            prefix: "DOB"},
+};
+const DISCLOSURE = {
+  BLOCK:       {label: "Block outright",          chip: "Block"},
+  SURROGATE:   {label: "Replace with a surrogate", chip: "Surrogate"},
+  KEEP_LAST_4: {label: "Mask all but the last 4", chip: "Last 4"},
+  ALLOW:       {label: "Let it pass",             chip: "Allow"},
+};
+const KINDS = {
+  BASKET_SNEAKING:   {label: "Pre-ticked add-ons",  hint: "Insurance, tips, donations",       code: "CCPA 1", color: "var(--p-addon)",   fixable: true},
+  FALSE_URGENCY:     {label: "Fake urgency",        hint: "Timers that reset, “only 2 left”", code: "CCPA 2", color: "var(--p-urgency)", fixable: false},
+  DRIP_PRICING:      {label: "Last-step fees",      hint: "Charges that appear at payment",   code: "CCPA 6", color: "var(--p-fee)",     fixable: false},
+  CONFIRM_SHAMING:   {label: "Confirmshaming",      hint: "“No thanks, I don’t like saving”", code: "CCPA 4", color: "var(--p-shame)",   fixable: false},
+  SUBSCRIPTION_TRAP: {label: "Subscription traps",  hint: "Free trials that auto-renew",      code: "CCPA 3", color: "var(--p-sub)",     fixable: true},
+};
+const CHECKOUT_ACTIONS = {AUTO_REMOVE: "Auto-remove", ASK_ME: "Ask me", FLAG_ONLY: "Flag only", IGNORE: "Ignore"};
+
+const DEFAULT_POLICY = () => ({
+  disclosure: {GOV_ID: "BLOCK", CARD: "BLOCK", BANK_ACCOUNT: "BLOCK", PERSON_NAME: "SURROGATE", MONEY_AMOUNT: "SURROGATE",
+               PHONE: "SURROGATE", EMAIL: "SURROGATE", ADDRESS: "SURROGATE", DATE_OF_BIRTH: "SURROGATE"},
+  checkout: {BASKET_SNEAKING: "ASK_ME", FALSE_URGENCY: "FLAG_ONLY", SUBSCRIPTION_TRAP: "ASK_ME", CONFIRM_SHAMING: "FLAG_ONLY", DRIP_PRICING: "ASK_ME"},
+});
+function disclosureFor(cat) { return state.policy.disclosure[cat] || "ALLOW"; }
+function actionForKind(kind) {
+  const a = state.policy.checkout[kind];
+  // Auto-remove is meaningless for patterns that cannot be undone on screen.
+  return a === "AUTO_REMOVE" && !KINDS[kind].fixable ? "ASK_ME" : a;
+}
+
+/* ============================== MONEY (paise) ============================== */
+const AMOUNT_RE = /(?:₹|\bRs\.?|\bINR)\s?(\d[\d,]*(?:\.\d{1,2})?)|(?<![\d,.])(\d[\d,]*(?:\.\d{1,2})?)\s?(?:[Rr]upees?)\b/g;
+const RECURRING_RE = /(?:₹|\bRs\.?|\bINR)\s?(\d[\d,]*(?:\.\d{1,2})?)\s*(?:\/\s*|per\s+|a\s+|every\s+)(?:mo|month|mth|yr|year|week|wk)\b/gi;
+const Money = {
+  parse(n) {
+    const [r, f = ""] = n.replace(/,/g, "").split(".");
+    return (parseInt(r, 10) || 0) * 100 + (parseInt((f + "00").slice(0, 2), 10) || 0);
+  },
+  /** One-off amounts, ignoring amounts that are part of a recurring price. */
+  oneOff(text) {
+    const rec = [...text.matchAll(RECURRING_RE)].map(m => [m.index, m.index + m[0].length]);
+    return [...text.matchAll(AMOUNT_RE)].filter(m => !rec.some(([a, b]) => m.index >= a && m.index < b)).map(m => Money.parse(m[1] || m[2]));
+  },
+  /** The first recurring charge, normalised to a month. */
+  recurring(text) {
+    const m = [...text.matchAll(RECURRING_RE)][0];
+    if (!m) return 0;
+    const a = Money.parse(m[1]), u = m[0].toLowerCase();
+    if (/yr|year/.test(u)) return Math.floor(a / 12);
+    if (/week|wk/.test(u)) return Math.floor(a * 52 / 12);
+    return a;
+  },
+  fmt(p) {
+    const neg = p < 0, abs = Math.abs(p);
+    let r = String(Math.floor(abs / 100));
+    if (r.length > 3) r = r.slice(0, -3).replace(/\B(?=(\d{2})+(?!\d))/g, ",") + "," + r.slice(-3);
+    const f = abs % 100;
+    return (neg ? "−₹" : "₹") + r + (f ? "." + String(f).padStart(2, "0") : "");
+  },
+};
+
+/* ============================== DETECTORS ============================== */
+const Checksums = {
+  luhn(d) {
+    if (!/^\d+$/.test(d)) return false;
+    let sum = 0;
+    [...d].reverse().forEach((c, i) => { let x = +c; if (i % 2) { x *= 2; if (x > 9) x -= 9; } sum += x; });
+    return sum % 10 === 0;
+  },
+  D: [[0,1,2,3,4,5,6,7,8,9],[1,2,3,4,0,6,7,8,9,5],[2,3,4,0,1,7,8,9,5,6],[3,4,0,1,2,8,9,5,6,7],[4,0,1,2,3,9,5,6,7,8],
+      [5,9,8,7,6,0,4,3,2,1],[6,5,9,8,7,1,0,4,3,2],[7,6,5,9,8,2,1,0,4,3],[8,7,6,5,9,3,2,1,0,4],[9,8,7,6,5,4,3,2,1,0]],
+  P: [[0,1,2,3,4,5,6,7,8,9],[1,5,7,6,2,8,3,0,9,4],[5,8,0,3,7,9,6,1,4,2],[8,9,1,6,0,4,3,5,2,7],
+      [9,4,5,3,1,2,6,8,7,0],[4,2,8,6,5,7,3,9,0,1],[2,7,9,3,8,0,6,4,1,5],[7,0,4,6,9,1,3,2,5,8]],
+  /** Verhoeff check used by Aadhaar numbers. */
+  verhoeff(d) {
+    if (!/^\d+$/.test(d)) return false;
+    let c = 0;
+    [...d].reverse().forEach((ch, i) => { c = Checksums.D[c][Checksums.P[i % 8][+ch]]; });
+    return c === 0;
+  },
+};
+const digitsOnly = s => s.replace(/\D/g, "");
+
+/** A regex detector. A named group `v` narrows what is reported, so a label can anchor a match without being masked. */
+function rx(cat, name, re, accept = () => true) {
+  const flags = [...new Set(re.flags + "gd")].join("");
+  return {cat, name, find(text) {
+    const out = [];
+    for (const m of text.matchAll(new RegExp(re.source, flags))) {
+      const hasV = m.groups && m.groups.v !== undefined;
+      const [start, end] = hasV ? m.indices.groups.v : m.indices[0];
+      const value = text.slice(start, end);
+      if (accept(value)) out.push({cat, name, value, start, end});
+    }
+    return out;
+  }};
+}
+/** Indian postal addresses: a line with a comma whose address part ends in a six-digit PIN. */
+const AddressDetector = {cat: "ADDRESS", name: "Address", find(text) {
+  const out = []; let lineStart = 0;
+  for (const line of text.split("\n")) {
+    const pins = [...line.matchAll(/(?<!\d)[1-9]\d{2}\s?\d{3}(?!\d)/g)];
+    const pm = pins[pins.length - 1];
+    if (pm) {
+      const before = line.slice(0, pm.index);
+      if (before.includes(",") && /\p{L}/u.test(before)) {
+        const lab = line.match(/^\s*[A-Za-zऀ-ॿ][A-Za-zऀ-ॿ ]{0,30}[:ः]\s*/);
+        const from = lab ? lab[0].length : line.search(/\S/);
+        const to = pm.index + pm[0].length;
+        if (from >= 0 && from < to) out.push({cat: "ADDRESS", name: "Address", value: line.slice(from, to), start: lineStart + from, end: lineStart + to});
+      }
+    }
+    lineStart += line.length + 1;
+  }
+  return out;
+}};
+const CAP = "[A-Z][a-z]+";
+const NAME = `(?:[A-Z]\\.[ \\t]?)*${CAP}(?:[ \\t]+${CAP}){0,2}`;
+const DEVA = "[\\u0900-\\u0963\\u0971-\\u097F]+";
+const NOT_PP = "(?!(?:को|का|की|के|ने|से|में|पर|और|है|जी)(?![\\u0900-\\u097F]))";
+const NAME_HI = `${DEVA}(?:[ \\t]+${NOT_PP}${DEVA}){0,2}`;
+const NOT_NAMES = new Set(["Sir", "Madam", "Customer", "Team", "User", "Friend", "All"]);
+
+/* Priority order: when two detections overlap, the earlier detector wins, then the longer span. */
+const DETECTORS = [
+  rx("EMAIL", "Email", /\b[\w.+-]+@[\w-]+(?:\.[\w-]+)*\.[A-Za-z]{2,}\b/),
+  rx("GOV_ID", "Aadhaar", /(?<![\d-])[2-9]\d{3}[ -]?\d{4}[ -]?\d{4}(?![\d-])/, v => Checksums.verhoeff(digitsOnly(v))),
+  rx("GOV_ID", "Aadhaar (masked)", /(?<![\w*])[Xx*]{4}[ -]?[Xx*]{4}[ -]?\d{4}(?!\d)/),
+  rx("GOV_ID", "PAN", /\b[A-Z]{3}[ABCFGHLJPT][A-Z]\d{4}[A-Z]\b/),
+  rx("CARD", "Card number", /(?<!\d)\d(?:[ -]?\d){12,18}(?!\d)/, v => { const d = digitsOnly(v); return d.length >= 13 && d.length <= 19 && Checksums.luhn(d); }),
+  AddressDetector,
+  rx("PHONE", "Phone", /(?<![\d+])(?:\+91[\s-]?|0)?[6-9]\d{4}[\s-]?\d{5}(?!\d)/),
+  rx("BANK_ACCOUNT", "Account number", /(?<!\d)\d{9,18}(?!\d)/),
+  rx("DATE_OF_BIRTH", "Date of birth", /\b(?:dob|d\.o\.b\.?|date of birth|born on)\s*[:\-]?\s*(?<v>\d{1,2}[\/.\- ]\d{1,2}[\/.\- ]\d{2,4}|\d{1,2}\s+[A-Za-z]{3,9},?\s+\d{4})/i),
+  rx("DATE_OF_BIRTH", "Date of birth", /(?:जन्म[ \t]*(?:तिथि|तारीख)|जन्मतिथि)[ \t]*[:ः\-]?[ \t]*(?<v>\d{1,2}[\/.\- ]\d{1,2}[\/.\- ]\d{2,4})/),
+  rx("MONEY_AMOUNT", "Amount", /(?:₹|\bRs\.?|\bINR)\s?\d[\d,]*(?:\.\d{1,2})?(?:\s?(?:lakhs?|crores?|cr|L|k)\b)?|\b\d+(?:\.\d+)?\s?(?:LPA|lakhs?|crores?)\b|(?<![ऀ-ॿ])(?:रु\.?|रुपये)[ \t]?\d[\d,]*(?:\.\d{1,2})?|(?<![\d,])\d[\d,]*(?:\.\d{1,2})?[ \t]?(?:रुपये|रुपए|लाख|करोड़)/),
+  rx("PERSON_NAME", "Name", new RegExp(`\\b(?:Mr|Ms|Mrs|Dr|Shri|Smt|Kumari)\\.?[ \\t]+(?<v>${NAME})\\b`)),
+  rx("PERSON_NAME", "Name", new RegExp(`(?:\\b(?:[Nn]ame|NAME)[ \\t]*[:\\-][ \\t]*|\\bDear[ \\t]+)(?<v>${NAME})\\b`), v => !NOT_NAMES.has(v)),
+  rx("PERSON_NAME", "Name", new RegExp(`(?<![\\u0900-\\u097F])(?:श्रीमती|श्री|सुश्री|कुमारी|डॉ\\.?)[ \\t]+(?<v>${NAME_HI})`)),
+  rx("PERSON_NAME", "Name", new RegExp(`(?:(?<![\\u0900-\\u097F])नाम[ \\t]*[:\\u0903\\-][ \\t]*|(?<![\\u0900-\\u097F])प्रिय[ \\t]+(?!श्री|सुश्री|कुमारी|डॉ))(?<v>${NAME_HI}|${NAME})`)),
 ];
-const ACTS={block:"Block outright",surrogate:"Replace with a surrogate",flag:"Flag for me",allow:"Let it pass"};
 
-function renderPolicy(){
-  $("policyRules").innerHTML=POLICY.map(r=>`
-    <div class="prule">
-      <span class="pk">${r.key}</span>
-      <span style="flex:1">${r.label}</span>
-      <select data-pk="${r.key}" aria-label="Policy for ${r.label}">
-        ${Object.entries(ACTS).map(([v,l])=>`<option value="${v}" ${v===r.act?"selected":""}>${l}</option>`).join("")}
-      </select>
-    </div>`).join("");
-  $("policyRules").querySelectorAll("select").forEach(s=>{
-    s.addEventListener("change",()=>{
-      POLICY.find(r=>r.key===s.dataset.pk).act=s.value;
-    });
+/** Runs every detector and resolves overlaps into a clean, ordered list of spans. */
+function classify(text) {
+  const cands = [];
+  DETECTORS.forEach((d, rank) => d.find(text).forEach(x => cands.push([rank, x])));
+  cands.sort((a, b) => a[0] - b[0] || (b[1].end - b[1].start) - (a[1].end - a[1].start));
+  const taken = [];
+  for (const [, c] of cands) if (taken.every(t => t.end <= c.start || t.start >= c.end)) taken.push(c);
+  return taken.sort((a, b) => a.start - b.start);
+}
+
+/* ============================== SANITIZER + VAULT ============================== */
+const BLOCKED = "[BLOCKED]";
+function keepLast4(v) {
+  const n = (v.match(/[\p{L}\p{N}]/gu) || []).length;
+  let seen = 0;
+  return [...v].map(c => /[\p{L}\p{N}]/u.test(c) ? (++seen > n - 4 ? c : "X") : c).join("");
+}
+const normalise = v => v.replace(/[\s-]/g, "").toLowerCase();
+
+/** The outbound gate for text. Deterministic: the same text and policy always give the same output. */
+function sanitize(text) {
+  const detections = classify(text);
+  const counters = {}, tokenFor = new Map(), vault = [], spans = [];
+  let out = "", cursor = 0;
+  for (const d of detections) {
+    out += text.slice(cursor, d.start);
+    const act = disclosureFor(d.cat);
+    let rep;
+    if (act === "ALLOW") rep = d.value;
+    else if (act === "BLOCK") { rep = BLOCKED; vault.push({token: BLOCKED, real: d.value, cat: d.cat, act}); }
+    else if (act === "KEEP_LAST_4") { rep = keepLast4(d.value); vault.push({token: rep, real: d.value, cat: d.cat, act}); }
+    else {
+      const key = d.cat + "|" + normalise(d.value);
+      rep = tokenFor.get(key);
+      if (!rep) {
+        const p = CATEGORIES[d.cat].prefix;
+        counters[p] = (counters[p] || 0) + 1;
+        rep = `<${p}_${counters[p]}>`;
+        tokenFor.set(key, rep);
+        vault.push({token: rep, real: d.value, cat: d.cat, act});
+      }
+    }
+    spans.push({start: out.length, end: out.length + rep.length, act});
+    out += rep;
+    cursor = d.end;
+  }
+  out += text.slice(cursor);
+  return {original: text, sanitized: out, detections, vault, spans};
+}
+/** Re-inserts real values into a reply from an outside model. Tokens are accepted with or without brackets. */
+function rehydrate(reply, vault) {
+  const by = new Map(vault.filter(v => v.act === "SURROGATE").map(v => [v.token.slice(1, -1), v.real]));
+  let text = "", html = "", cur = 0, restored = 0;
+  for (const m of reply.matchAll(/<([A-Z]+_\d+)>|\b([A-Z]+_\d+)\b/g)) {
+    const real = by.get(m[1] || m[2]);
+    text += reply.slice(cur, m.index); html += esc(reply.slice(cur, m.index));
+    if (real !== undefined) { text += real; html += `<mark class="back">${esc(real)}</mark>`; restored++; }
+    else { text += m[0]; html += esc(m[0]); }
+    cur = m.index + m[0].length;
+  }
+  text += reply.slice(cur); html += esc(reply.slice(cur));
+  return {text, html, restored};
+}
+function sanitizedHtml(r) {
+  let html = "", cur = 0;
+  for (const s of r.spans) {
+    html += esc(r.sanitized.slice(cur, s.start));
+    const cls = s.act === "BLOCK" ? "blk" : s.act === "KEEP_LAST_4" ? "l4" : s.act === "SURROGATE" ? "tok" : "";
+    const piece = esc(r.sanitized.slice(s.start, s.end));
+    html += cls ? `<mark class="${cls}">${piece}</mark>` : piece;
+    cur = s.end;
+  }
+  return html + esc(r.sanitized.slice(cur));
+}
+
+/* ============================== AGENT (rule-based planner) ============================== */
+const NFC = s => s.normalize("NFC");
+const OUTSIDE = ["compare", "typical", "market", "benchmark", "average", "industry", "latest", "current rate",
+  "news", "underpaid", "overpaid", "is this fair", "should i", "research", "search", "look up",
+  "legal", " law", "tax rule", "regulation", "बाज़ार", "बाजार", "तुलना", "कानून", "क़ानून", "औसत", "ऑनलाइन", "आम परिवार"].map(NFC);
+const SUMMARISE = ["summar", "tl;dr", "tldr", "key terms", "key points", "gist", "in short", "main points", "सारांश"];
+const EXTRACT = ["extract", "list the", "pull out", "what are the numbers", "find the", "which amounts", "सूची", "निकाल"];
+const SKIP_PREFIXES = ["subject:", "dear ", "regards", "thanks", "thank you", "sincerely"];
+const REASONS = {
+  needs_outside_knowledge: "It needs knowledge the local model does not have.",
+  too_complex: "It is beyond what the local model can do reliably.",
+};
+const Agent = {
+  plan(request) {
+    const r = NFC(request.toLowerCase());
+    if (OUTSIDE.some(k => r.includes(k))) return {name: "hand_back", arguments: {reason: "needs_outside_knowledge"}};
+    if (SUMMARISE.some(k => r.includes(k))) return {name: "answer_locally", arguments: {task: "summarise"}};
+    if (EXTRACT.some(k => r.includes(k))) return {name: "answer_locally", arguments: {task: "extract"}};
+    return {name: "hand_back", arguments: {reason: "too_complex"}};
+  },
+  answer(task, doc) {
+    if (task === "summarise") {
+      const lines = doc.split("\n").map(l => l.trim()).filter(l => l.length >= 20)
+        .filter(l => !SKIP_PREFIXES.some(p => l.toLowerCase().startsWith(p)));
+      const chosen = [...new Set([...lines.filter(l => classify(l).length), ...lines])].slice(0, 3);
+      return chosen.length ? chosen.map(l => "• " + l).join("\n") : "There is not enough in this text to summarise.";
+    }
+    if (task === "extract") {
+      const found = classify(doc);
+      if (!found.length) return "No names, numbers or amounts found.";
+      const counts = {};
+      found.forEach(f => { const k = CATEGORIES[f.cat].label.toLowerCase(); counts[k] = (counts[k] || 0) + 1; });
+      const head = `${found.length} item(s): ` + Object.entries(counts).sort((a, b) => b[1] - a[1]).map(([k, n]) => `${n} ${k}`).join(" · ");
+      return head + "\n\n" + found.slice(0, 40).map(f => `${f.name}: ${f.value}`).join("\n");
+    }
+    return null;
+  },
+};
+/** Channel B. The agent plans; deterministic code decides and executes. */
+function disclosureGate(doc, request) {
+  const t0 = performance.now();
+  const result = sanitize(request.trim() ? `${doc}\n\n${request}` : doc);
+  const plan = Agent.plan(request);
+  if (plan.name === "answer_locally") {
+    const answer = Agent.answer(plan.arguments.task, doc);
+    if (answer != null) return {kind: "local", plan, answer, result, ms: performance.now() - t0};
+  }
+  const reason = plan.arguments.reason || "too_complex";
+  return {kind: "handback", plan, reason, outbound: result.sanitized, result, ms: performance.now() - t0};
+}
+function suggestions(doc) {
+  const lower = doc.toLowerCase();
+  if (!doc.trim()) return [];
+  const has = (...w) => w.some(x => lower.includes(x));
+  const cats = new Set(classify(doc.slice(0, 20000)).map(d => d.cat));
+  const list = ["List personal data", "List the personal data in this document."];
+  if (has("statement", "opening balance", "closing balance", "debit", "withdrawal"))
+    return [["Summarise", "Summarise this statement."], list, ["Unusual spending?", "Compare this spending with typical households and tell me if anything is unusual."]];
+  if (has("salary", "compensation", "ctc", "payslip", "gross pay", "net pay"))
+    return [["Summarise", "Summarise the key terms of this letter in three lines."], ["Am I underpaid?", "Compare this against typical FY26 compensation bands for my role and tell me if I am underpaid."], list];
+  if (has("agreement", "lease", "tenant", "landlord", "clause", "hereby"))
+    return [["Summarise", "Summarise the key terms of this agreement."], list, ["Is it legal?", "Is anything in this agreement against Indian law?"]];
+  if (cats.has("GOV_ID")) return [list, ["Verify this ID", "Look up whether this ID is valid."]];
+  return [["Summarise", "Summarise this."], list];
+}
+
+/* ============================== LEDGER (SHA-256 chained) ============================== */
+function sha256(str) {
+  const bytes = new TextEncoder().encode(str);
+  let ascii = ""; for (const b of bytes) ascii += String.fromCharCode(b);
+  const rr = (v, n) => (v >>> n) | (v << (32 - n));
+  const maxWord = 2 ** 32, H = [], K = [], composite = {};
+  for (let c = 2, n = 0; n < 64; c++) {
+    if (!composite[c]) {
+      for (let i = 0; i < 313; i += c) composite[i] = c;
+      H[n] = (c ** .5 * maxWord) | 0;
+      K[n++] = (c ** (1 / 3) * maxWord) | 0;
+    }
+  }
+  let hash = H.slice(0, 8);
+  const bitLen = ascii.length * 8;
+  ascii += "\x80";
+  while (ascii.length % 64 - 56) ascii += "\x00";
+  const words = [];
+  for (let i = 0; i < ascii.length; i++) words[i >> 2] |= ascii.charCodeAt(i) << ((3 - i) % 4) * 8;
+  words[words.length] = (bitLen / maxWord) | 0;
+  words[words.length] = bitLen;
+  for (let j = 0; j < words.length;) {
+    const w = words.slice(j, j += 16), old = hash;
+    hash = hash.slice(0, 8);
+    for (let i = 0; i < 64; i++) {
+      const w15 = w[i - 15], w2 = w[i - 2], a = hash[0], e = hash[4];
+      const t1 = hash[7] + (rr(e, 6) ^ rr(e, 11) ^ rr(e, 25)) + ((e & hash[5]) ^ (~e & hash[6])) + K[i]
+        + (w[i] = i < 16 ? w[i] : (w[i - 16] + (rr(w15, 7) ^ rr(w15, 18) ^ (w15 >>> 3)) + w[i - 7] + (rr(w2, 17) ^ rr(w2, 19) ^ (w2 >>> 10))) | 0);
+      const t2 = (rr(a, 2) ^ rr(a, 13) ^ rr(a, 22)) + ((a & hash[1]) ^ (a & hash[2]) ^ (hash[1] & hash[2]));
+      hash = [(t1 + t2) | 0].concat(hash);
+      hash[4] = (hash[4] + t1) | 0;
+    }
+    for (let i = 0; i < 8; i++) hash[i] = (hash[i] + old[i]) | 0;
+  }
+  return hash.slice(0, 8).map(h => (h >>> 0).toString(16).padStart(8, "0")).join("");
+}
+const GENESIS = "0".repeat(64);
+const Ledger = {
+  entries: [],
+  material(e, prev) {
+    return [e.seq, e.time, e.channel, e.verdict, e.detail, e.saved, e.masked, e.patterns, e.kinds.join(","), prev].join("\u001f");
+  },
+  /** Entries hold counts and categories, never the sensitive values. */
+  append(o) {
+    const last = this.entries[this.entries.length - 1];
+    const e = {seq: (last ? last.seq : 0) + 1, time: Date.now(), saved: 0, masked: 0, patterns: 0, kinds: [], ...o};
+    e.prevHash = last ? last.hash : GENESIS;
+    e.hash = sha256(this.material(e, e.prevHash));
+    this.entries.push(e);
+    return e;
+  },
+  /** Index of the first entry that does not chain, or -1 when intact. */
+  verify() {
+    let prev = GENESIS;
+    for (let i = 0; i < this.entries.length; i++) {
+      const e = this.entries[i];
+      if (e.prevHash !== prev || e.hash !== sha256(this.material(e, prev))) return i;
+      prev = e.hash;
+    }
+    return -1;
+  },
+  totals() {
+    return this.entries.reduce((t, e) => ({patterns: t.patterns + e.patterns, saved: t.saved + e.saved, masked: t.masked + e.masked}), {patterns: 0, saved: 0, masked: 0});
+  },
+};
+const VERDICT_CLASS = {"fixed": "fixed", "held locally": "held", "handed back": "handed", "flagged": "flagged", "kept": "kept", "blocked": "flagged"};
+
+/* ============================== DEMO CARTS ============================== */
+const CARTS = [
+  {id: "fashion", store: "Threadline", kind: "Shopping", lines: [
+    ["Cotton kurta, size M", "₹1,299"], ["Standard delivery", "Free"],
+    ["Round up and donate to a cause", "₹10", "TICKED"], ["Purchase protection plan", "₹149", "TICKED"],
+    ["Start a 30-day free trial (auto-renews at ₹299/mo)", "Free", "TICKED"], ["Handling fee", "₹49", "FEE"]],
+    banners: ["Only 2 left — offer ends in 05:00"], decline: "No thanks, I don't care about supporting local artisans"},
+  {id: "food", store: "Tiffin Run", kind: "Food delivery", lines: [
+    ["Chicken biryani × 1", "₹349"], ["Paneer tikka × 1", "₹249"], ["Delivery", "Free"],
+    ["Tip your delivery partner", "₹30", "TICKED"], ["Gold membership: free trial, then ₹149/month", "Free", "TICKED"],
+    ["Platform fee", "₹10", "FEE"], ["Packaging fee", "₹25", "FEE"]],
+    banners: ["Hurry! 18 people are looking at this restaurant"], decline: "No thanks, I don't want to save on every order"},
+  {id: "flight", store: "SkyHop", kind: "Travel", lines: [
+    ["BLR → HYD, 1 adult, 14 Oct", "₹4,899"], ["Travel insurance for this trip", "₹299", "TICKED"],
+    ["Donate to plant trees", "₹10", "TICKED"], ["Seat selection", "₹0"], ["Convenience fee", "₹350", "FEE"]],
+    banners: ["Only 3 left at this fare"], decline: "No thanks, I'd rather risk losing my money"},
+  {id: "movie", store: "ReelSeat", kind: "Tickets", lines: [
+    ["2 × Recliner, Screen 3, 7:30 PM", "₹560"], ["Ticket cancellation protection", "₹29", "TICKED"],
+    ["Convenience fee (incl. GST)", "₹70.80", "FEE"]],
+    banners: ["Seats selling fast"]},
+  {id: "grocery", store: "QuickBasket", kind: "Groceries", lines: [
+    ["Toned milk, 1 L", "₹66"], ["Whole wheat bread", "₹45"], ["Delivery partner tip", "₹20", "TICKED"],
+    ["Pro membership: 30-day free trial, then ₹99/month", "Free", "TICKED"], ["Small cart fee", "₹35", "FEE"], ["Handling charge", "₹9", "FEE"]],
+    banners: ["Offer ends in 09:59"]},
+  {id: "honest", store: "Plain Books", kind: "Shopping", lines: [
+    ["Paperback: The Monsoon Map", "₹399"], ["Delivery", "Free"], ["Gift wrap", "₹30", "OFFERED"]]},
+];
+const cartById = id => CARTS.find(c => c.id === id) || CARTS[0];
+const optional = l => l[2] === "TICKED" || l[2] === "OFFERED";
+function cartTotal(cart, ticked) {
+  return cart.lines.reduce((s, l, i) => s + (!optional(l) || ticked[i] ? (Money.oneOff(l[1])[0] || 0) : 0), 0);
+}
+
+/* ============================== CHANNEL A: SCANNER ============================== */
+const TRIAL = /\b(trial|membership|subscription|auto-renew)/i;
+const FEE = /\b(fee|charges?|surcharge)\b/i;
+const URGENCY = /\b(offer ends|ends in|only \d+ left|hurry|selling fast|people are (looking|viewing))\b|\d{1,2}:\d{2}/i;
+const SHAME = /\b(no thanks|i don'?t|i'?d rather|i do not)\b/i;
+/** Reads a screen and never touches it. The DOM of the store stands in for the accessibility tree. */
+function scanScreen(root) {
+  const nodes = [...root.querySelectorAll("[data-node]")].map(el => {
+    const cb = el.querySelector("input[type=checkbox]");
+    return {id: el.dataset.i, role: el.dataset.node, label: el.dataset.label || el.textContent.trim(),
+            text: el.textContent.replace(/\s+/g, " ").trim(), checkable: !!cb, checked: !!(cb && cb.checked)};
   });
-}
-const policyFor=k=>(POLICY.find(r=>r.key===k)||{act:"allow"}).act;
-
-/* ===================== CLASSIFIER (deterministic) ===================== */
-const DETECTORS=[
-  {key:"gov_id",       label:"Aadhaar / PAN",   re:/\b(?:\d{4}\s?\d{4}\s?\d{4}|[A-Z]{5}\d{4}[A-Z])\b/g},
-  {key:"bank_account", label:"Account number",  re:/\b\d{9,18}\b/g},
-  {key:"email",        label:"Email",           re:/\b[\w.+-]+@[\w-]+\.[\w.]{2,}\b/g},
-  {key:"phone",        label:"Phone",           re:/\b(?:\+91[-\s]?)?[6-9]\d{9}\b/g},
-  {key:"money_amount", label:"Amount",          re:/(?:₹|Rs\.?\s?|INR\s?)[\d,]+(?:\.\d{2})?/g},
-  {key:"person_name",  label:"Name",            re:/\b(?:Mr|Ms|Mrs|Shri|Smt)\.?\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?\b/g},
-  {key:"address",      label:"Address",         re:/\b\d{1,4}[-/]?\d{0,3},?\s+[A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)*,\s*(?:Hyderabad|Bengaluru|Mumbai|Delhi|Chennai|Pune)\b[^,\n]*/g}
-];
-
-/* order matters: longest spans first so a phone inside an account number
-   does not get double-matched */
-function classify(text){
-  const found=[]; const taken=[];
-  const overlaps=(s,e)=>taken.some(([a,b])=>s<b&&e>a);
-  for(const d of DETECTORS){
-    d.re.lastIndex=0; let m;
-    while((m=d.re.exec(text))!==null){
-      const s=m.index, e=s+m[0].length;
-      if(overlaps(s,e)) continue;
-      taken.push([s,e]);
-      found.push({key:d.key,label:d.label,value:m[0],start:s,end:e});
+  const screenText = nodes.map(n => n.text).join("\n");
+  // A checkout word alone is not enough; a cart shows prices.
+  if (!/\b(pay|checkout|total)\b/i.test(screenText) || Money.oneOff(screenText).length < 2) return {isCheckout: false, findings: []};
+  const findings = [];
+  for (const n of nodes) {
+    if (n.role === "line") {
+      const cost = Money.oneOff(n.text)[0] || 0;
+      if (n.checkable && n.checked) {
+        const recurring = Money.recurring(n.text);
+        const kind = recurring || TRIAL.test(n.text) ? "SUBSCRIPTION_TRAP" : "BASKET_SNEAKING";
+        findings.push({kind, evidence: n.label, nodeId: n.id, cost, recurring});
+      } else if (!n.checkable && FEE.test(n.label) && cost > 0) {
+        findings.push({kind: "DRIP_PRICING", evidence: n.label, nodeId: null, cost, recurring: 0});
+      }
+    } else if (n.role === "banner" && URGENCY.test(n.text)) {
+      findings.push({kind: "FALSE_URGENCY", evidence: n.text, nodeId: null, cost: 0, recurring: 0});
+    } else if (n.role === "decline" && SHAME.test(n.text)) {
+      findings.push({kind: "CONFIRM_SHAMING", evidence: n.text, nodeId: null, cost: 0, recurring: 0});
     }
   }
-  return found.sort((a,b)=>a.start-b.start);
+  findings.forEach(f => { f.fixable = f.nodeId != null && KINDS[f.kind].fixable; });
+  return {isCheckout: true, findings};
 }
 
-/* ===================== SURROGATES ===================== */
-const PREFIX={gov_id:"GOVID",bank_account:"ACCT",email:"EMAIL",phone:"PHONE",
-              money_amount:"AMOUNT",person_name:"PERSON",address:"ADDRESS"};
-function applyPolicy(text,found){
-  const counters={}, vault=[]; let out="", cursor=0, blocked=false;
-  for(const f of found){
-    const act=policyFor(f.key);
-    out+=text.slice(cursor,f.start);
-    if(act==="allow"){ out+=f.value; }
-    else if(act==="block"){ out+="[BLOCKED]"; blocked=true; vault.push({tok:"[BLOCKED]",real:f.value,key:f.key,act}); }
-    else{
-      const p=PREFIX[f.key]||"ITEM";
-      counters[p]=(counters[p]||0)+1;
-      const tok=`<${p}_${counters[p]}>`;
-      out+=tok; vault.push({tok,real:f.value,key:f.key,act:"surrogate"});
-    }
-    cursor=f.end;
-  }
-  out+=text.slice(cursor);
-  return {sanitized:out,vault,blocked};
-}
-
-/* ===================== LEDGER ===================== */
-const LEDGER=[];
-function log(verdict,channel,detail){
-  LEDGER.unshift({t:new Date().toLocaleTimeString([], {hour:"2-digit",minute:"2-digit",second:"2-digit"}),
-                  verdict,channel,detail});
-  renderLedger();
-}
-function renderLedger(){
-  if(!LEDGER.length){ $("ledgerBody").innerHTML='<p class="empty">No decisions recorded yet.</p>'; return; }
-  const cls={ "held locally":"local", "handed back":"released", "blocked":"blocked", "fixed":"fixed" };
-  $("ledgerBody").innerHTML=LEDGER.map(e=>`
-    <div class="lentry">
-      <span class="t">${e.t}</span>
-      <span class="v ${cls[e.verdict]||"local"}">${e.verdict.toUpperCase()}</span>
-      <span>${e.detail}</span>
-    </div>`).join("");
-}
-$("clearLedger").addEventListener("click",()=>{LEDGER.length=0;renderLedger();});
-
-/* ===================== CHANNEL B ===================== */
-const SAMPLE=`Subject: Salary revision — FY 2026-27
+/* ============================== SAMPLES ============================== */
+const SAMPLE_LETTER = `Subject: Salary revision — FY 2026-27
 
 Dear Mr Rajesh Kumar,
 
@@ -374,196 +830,900 @@ Registered address: 12-4-89, Kondapur Main Road, Hyderabad 500084
 Contact: rajesh.kumar@example.com / +91 98490 12345
 
 Please confirm receipt within seven working days.`;
+const SAMPLE_REPLY = "For FY26, <AMOUNT_1> sits at the upper end of the band for this role, so <PERSON_1> is not underpaid. It is worth asking how the variable pay is calculated.";
+const HARD_Q = "Compare this against typical FY26 compensation bands for my role and tell me if I am underpaid.";
+function withVerhoeff(base) { for (let d = 0; d < 10; d++) if (Checksums.verhoeff(base + d)) return base + d; return base + "0"; }
+const AADHAAR = withVerhoeff("73916305482").replace(/(\d{4})(\d{4})(\d{4})/, "$1 $2 $3");
+const ID_CARD = {name: "Ananya Sharma", id: AADHAAR, dob: "14/08/1996", address: "Flat 302, Road No 5, Jubilee Hills, Hyderabad 500033"};
+const ID_TEXT = `Name: ${ID_CARD.name}\nAadhaar: ${ID_CARD.id}\nDOB: ${ID_CARD.dob}\nAddress: ${ID_CARD.address}`;
+const ID_FIELDS = [["name", "Name", "PERSON_NAME"], ["id", "ID number", "GOV_ID"], ["dob", "Date of birth", "DATE_OF_BIRTH"], ["address", "Address", "ADDRESS"]];
 
-const EASY="Summarise the key terms of this letter in three lines.";
-const HARD="Compare this against typical FY26 compensation bands for my role and tell me if I am underpaid.";
-let modeB="easy";
-
-$("sampleB").addEventListener("click",()=>{ $("inputB").value=SAMPLE; modeB="easy"; resetB(); });
-$("hardB").addEventListener("click",()=>{ if(!$("inputB").value.trim()) $("inputB").value=SAMPLE; modeB="hard"; runB(); });
-$("inputB").value=SAMPLE;
-
-function resetB(){
-  $("verdictB").innerHTML=""; $("foundB").innerHTML="";
-  $("outB").textContent="Nothing has been handed back."; $("vaultB").hidden=true; $("answerB").hidden=true;
-}
-
-function esc(s){return s.replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));}
-
-function highlight(text,found){
-  let out="",cur=0;
-  for(const f of found){
-    out+=esc(text.slice(cur,f.start))+`<mark class="pii">${esc(f.value)}</mark>`;
-    cur=f.end;
-  }
-  return out+esc(text.slice(cur));
-}
-function highlightSur(text){
-  return esc(text).replace(/&lt;([A-Z]+_\d+)&gt;|\[BLOCKED\]/g,m=>`<mark class="sur">${m}</mark>`);
-}
-
-async function runB(){
-  const text=$("inputB").value;
-  if(!text.trim()){ return; }
-  const found=classify(text);
-  const {sanitized,vault,blocked}=applyPolicy(text,found);
-
-  /* findings list */
-  const counts={};
-  found.forEach(f=>{counts[f.key]=(counts[f.key]||0)+1;});
-  $("foundB").innerHTML=`<h3>Classified on device</h3>`+
-    (found.length? Object.entries(counts).map(([k,n])=>{
-      const r=POLICY.find(p=>p.key===k)||{label:k};
-      return `<div class="finding"><div class="ft">
-        <span class="name">${r.label}</span>
-        <span class="code">${n} found · ${policyFor(k)}</span>
-      </div></div>`;
-    }).join("") : `<p class="empty">Nothing sensitive detected.</p>`);
-
-  /* highlight the original */
-  $("inputB").setAttribute("data-h","1");
-
-  if(modeB==="easy"){
-    /* local answer — nothing crosses */
-    $("verdictB").innerHTML=`<div class="verdict local">
-      <div><div class="big">Answered on the device</div>
-      <div class="sm">The local model handled this. Nothing needed to leave — not even a surrogate.</div></div>
-      <div class="mono" style="color:var(--cleared)">nothing to send</div></div>`;
-    $("outB").textContent="Nothing has been handed back.";
-    $("answerB").hidden=false;
-    $("answerBody").textContent=
-`Compensation revised to ₹18,40,000 per year, effective 1 April 2026.
-Payment continues to the existing HDFC account on file.
-Confirmation requested within seven working days.`;
-    $("vaultB").hidden=true;
-    log("held locally","B",`${found.length} sensitive item(s) classified; local model answered, nothing transmitted`);
-  } else {
-    /* handed back — nothing is sent by Parda */
-    $("verdictB").innerHTML=`<div class="verdict escalate">
-      <div><div class="big">Handed back sanitized</div>
-      <div class="sm">The local model could not answer this alone, so Parda prepared a safe version for your clipboard. It did not send it — it has no way to.</div></div>
-      <div class="mono" style="color:var(--held)">${vault.length} item(s) withheld</div></div>`;
-    $("outB").innerHTML=highlightSur(sanitized+"\n\n"+HARD);
-    $("vaultB").hidden=false;
-    $("vaultBody").innerHTML=vault.map(v=>
-      `<span class="mono">${esc(v.tok)}</span>  →  <mark class="pii">${esc(v.real)}</mark>`).join("\n");
-    $("answerB").hidden=false;
-    $("answerBody").innerHTML=
-`If you paste that into any outside model and bring the reply back,
-Parda re-inserts the real values locally:
-
-"<mark class="sur">&lt;AMOUNT_1&gt;</mark> sits at the upper end of the band for this role."
-
-reads back to you as:
-
-"<mark class="pii">₹18,40,000</mark> sits at the upper end of the band for this role."`;
-    log("handed back","B",
-      `${vault.length} item(s) substituted or blocked; sanitized text placed on clipboard, nothing transmitted`);
-  }
-  modeB="easy";
-}
-$("runB").addEventListener("click",runB);
-
-/* ===================== CHANNEL A ===================== */
-const BASE_CART=[
-  {id:"item",  label:"Cotton kurta, size M",              amt:1299, checked:true,  dark:null, locked:true},
-  {id:"ship",  label:"Standard delivery",                  amt:0,    checked:true,  dark:null, locked:true},
-  {id:"don",   label:"Round up and donate to a cause",     amt:10,   checked:true,  dark:"basket_sneaking"},
-  {id:"prot",  label:"Purchase protection plan",           amt:149,  checked:true,  dark:"basket_sneaking"},
-  {id:"prime", label:"Start a 30-day trial (auto-renews at ₹299/mo)", amt:0, checked:true, dark:"subscription_trap"},
-  {id:"fee",   label:"Handling fee",                       amt:49,   checked:true,  dark:"drip_pricing", locked:true}
-];
-let cart=JSON.parse(JSON.stringify(BASE_CART));
-
-const PATTERNS={
-  basket_sneaking:{name:"Basket sneaking",code:"CCPA 1",why:"An item you did not choose was added to your cart with the box already ticked."},
-  subscription_trap:{name:"Subscription trap",code:"CCPA 3",why:"A free trial is pre-enrolled and converts to a recurring charge unless you act."},
-  drip_pricing:{name:"Drip pricing",code:"CCPA 6",why:"A charge revealed only at the final step, after you committed to the purchase."},
-  false_urgency:{name:"False urgency",code:"CCPA 2",why:"A countdown or scarcity claim engineered to stop you from thinking."},
-  confirm_shaming:{name:"Confirm shaming",code:"CCPA 4",why:"Declining is worded to make you feel guilty."}
+/* ============================== STATE ============================== */
+const state = {
+  screen: "welcome", welcomeStep: 0,
+  perms: {acc: false, photos: false, notif: false},
+  flight: false,
+  policy: DEFAULT_POLICY(),
+  watching: [["Food delivery", true], ["Shopping", true], ["Travel", true], ["Tickets", true], ["Groceries", false]],
+  fw: {tab: "rules", adding: false},
+  air: {tab: "text", doc: SAMPLE_LETTER, q: "", busy: false, decision: null, reply: SAMPLE_REPLY, restored: null, mask: null},
+  vault: [],
+  store: null, sheet: null, tampered: null,
 };
 
-function renderCart(){
-  const total=cart.filter(i=>i.checked).reduce((s,i)=>s+i.amt,0);
-  $("cart").innerHTML=cart.map(i=>`
-    <div class="li ${i.dark&&i.checked?"sneak":""}">
-      <label class="lbl">
-        <input type="checkbox" data-id="${i.id}" ${i.checked?"checked":""} ${i.locked?"disabled":""}>
-        <span>${i.label}</span>
-      </label>
-      <span class="amt">${i.amt?"₹"+i.amt.toLocaleString("en-IN"):"Free"}</span>
-    </div>`).join("")
-    +`<div class="total"><span>Total payable</span><span class="amt">₹${total.toLocaleString("en-IN")}</span></div>
-      <div class="urgency">Only 2 left — offer ends in 04:58</div>
-      <div class="guilt">No thanks, I don't care about supporting local artisans</div>`;
-  $("cart").querySelectorAll("input[data-id]").forEach(cb=>{
-    cb.addEventListener("change",()=>{
-      cart.find(i=>i.id===cb.dataset.id).checked=cb.checked;
-      renderCart();
-    });
-  });
+/* ============================== HELPERS ============================== */
+function blobs(list) {
+  return list.map(([pos, size, color, op, blur]) =>
+    `<div class="blob" style="${pos};width:${size}px;height:${size}px;background:${color};opacity:${op};filter:blur(${blur}px)"></div>`).join("");
+}
+function ago(t) {
+  const s = Math.round((Date.now() - t) / 1000);
+  if (s < 45) return "just now";
+  const m = Math.round(s / 60);
+  return m < 60 ? `${m} min ago` : `${Math.round(m / 60)} hr ago`;
+}
+const clock = t => new Date(t).toLocaleTimeString([], {hour: "2-digit", minute: "2-digit", second: "2-digit"});
+let toastTimer;
+function toast(msg, ms = 2600) {
+  const t = $("#toast");
+  t.textContent = msg; t.classList.add("show");
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove("show"), ms);
+}
+async function copyText(s) {
+  try { await navigator.clipboard.writeText(s); return true; }
+  catch {
+    const ta = Object.assign(document.createElement("textarea"), {value: s});
+    document.body.append(ta); ta.select();
+    const ok = document.execCommand("copy"); ta.remove(); return ok;
+  }
 }
 
-function scanA(){
-  const findings=[];
-  cart.forEach(i=>{ if(i.dark&&i.checked) findings.push({...PATTERNS[i.dark],id:i.id,cost:i.amt,recurring:i.id==="prime"?299:0,locked:i.locked}); });
-  findings.push({...PATTERNS.false_urgency,id:"urg",cost:0});
-  findings.push({...PATTERNS.confirm_shaming,id:"guilt",cost:0});
-
-  const recoverable=findings.filter(f=>!f.locked).reduce((s,f)=>s+f.cost,0);
-  const recurring=findings.reduce((s,f)=>s+(f.recurring||0),0);
-
-  $("verdictA").innerHTML=`<div class="verdict escalate">
-    <div><div class="big">${findings.length} dark patterns on this screen</div>
-    <div class="sm">₹${recoverable} recoverable now${recurring?`, plus ₹${recurring}/month you did not agree to`:""}. Parda will not tap Pay for you.</div></div>
-    <div class="mono" style="color:var(--held)">policy: flag</div></div>`;
-
-  $("foundA").innerHTML=findings.map(f=>`
-    <div class="finding" id="f-${f.id}">
-      <div class="ft">
-        <span class="name">${f.name}</span>
-        <span class="code">${f.code}</span>
-      </div>
-      <div class="why">${f.why}</div>
-      <div class="ft" style="margin-top:7px">
-        <span class="cost">${f.cost?"₹"+f.cost:(f.recurring?"₹"+f.recurring+"/mo":"no direct cost")}</span>
-        ${f.locked||(!f.cost&&!f.recurring)
-          ? `<span class="code">${f.locked?"cannot be removed — disclosed only":"advisory"}</span>`
-          : `<button class="mini" data-fix="${f.id}">Fix this</button>`}
-      </div>
-    </div>`).join("");
-
-  $("foundA").querySelectorAll("button[data-fix]").forEach(b=>{
-    b.addEventListener("click",()=>{
-      const item=cart.find(i=>i.id===b.dataset.fix);
-      item.checked=false;
-      renderCart();
-      const card=$("f-"+b.dataset.fix);
-      card.classList.add("fixed");
-      b.replaceWith(Object.assign(document.createElement("span"),{className:"code",textContent:"removed"}));
-      log("fixed","A",`${PATTERNS[item.dark].name} removed — ₹${item.amt||299} not charged`);
-    });
-  });
-
-  log("blocked","A",`${findings.length} dark patterns identified; ₹${recoverable} flagged as recoverable`);
+/* ============================== RENDER: chrome ============================== */
+const TABS = [["home", "Home", "home"], ["firewall", "Firewall", "shieldCheck"], ["airlock", "Airlock", "lock"], ["settings", "Settings", "sliders"]];
+function renderChrome() {
+  const signal = '<svg width="18" height="12" viewBox="0 0 18 12" fill="currentColor"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5" width="3" height="7" rx="1"/><rect x="10" y="2.5" width="3" height="9.5" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg>';
+  const wifi = '<svg width="16" height="12" viewBox="0 0 16 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M1.5 4.2a9.5 9.5 0 0113 0M4 7a6 6 0 018 0"/><circle cx="8" cy="10" r="1.2" fill="currentColor" stroke="none"/></svg>';
+  const batt = '<svg width="26" height="12" viewBox="0 0 26 12" fill="none"><rect x=".5" y=".5" width="22" height="11" rx="3.5" stroke="currentColor" opacity=".4"/><rect x="2.5" y="2.5" width="16" height="7" rx="2" fill="currentColor"/><rect x="24" y="4" width="1.6" height="4" rx=".8" fill="currentColor" opacity=".4"/></svg>';
+  $("#sbIcons").innerHTML = state.flight ? icon("plane", 15, 2) + batt : signal + wifi + batt;
+  const showDock = ["home", "firewall", "airlock", "settings", "vault"].includes(state.screen);
+  const dock = $("#dock");
+  dock.hidden = !showDock;
+  const active = state.screen === "vault" ? "airlock" : state.screen;
+  dock.innerHTML = TABS.map(([id, label, ic]) =>
+    `<button data-act="go" data-arg="${id}" aria-label="${label}" ${active === id ? 'aria-current="page"' : ""}>${icon(ic, 22)}</button>`).join("");
 }
-$("runA").addEventListener("click",scanA);
-$("resetA").addEventListener("click",()=>{
-  cart=JSON.parse(JSON.stringify(BASE_CART));
-  renderCart(); $("verdictA").innerHTML="";
-  $("foundA").innerHTML='<p class="empty">Scan the screen to see what it is doing to you.</p>';
-});
 
-/* ===================== TABS ===================== */
-document.querySelectorAll(".tab").forEach(t=>{
-  t.addEventListener("click",()=>{
-    document.querySelectorAll(".tab").forEach(x=>x.setAttribute("aria-selected",String(x===t)));
-    $("ch-b").hidden = t.id!=="tab-b";
-    $("ch-a").hidden = t.id!=="tab-a";
+/* ============================== SCREENS ============================== */
+const SCREENS = {};
+
+SCREENS.welcome = () => {
+  const p = state.perms;
+  const perm = (key, ic, title, sub) => `
+    <div class="perm">
+      <div class="circle44">${icon(ic)}</div>
+      <div class="grow"><div class="t15">${title}</div><div class="t12">${sub}</div></div>
+      ${p[key] ? `<span class="on">${icon("check", 16, 2.4)}On</span>`
+               : `<button class="pill" data-act="perm" data-arg="${key}">Allow</button>`}
+    </div>`;
+  const step0 = `
+    <div class="appicon">${icon("shieldCheck", 40, 1.6)}</div>
+    <div class="center">
+      <h1>Parda watches the screen,<br>not you.</h1>
+      <p>Three permissions let it catch tricks at checkout and mask your details before you share.</p>
+    </div>
+    <div class="gap8" style="flex-direction:column">
+      ${perm("acc", "eye", "Accessibility", "Reads checkout screens to spot pre-ticked boxes and fake timers")}
+      ${perm("photos", "photo", "Photos you share", "Masks ID numbers and addresses before an image leaves the phone")}
+      ${perm("notif", "bell", "Notifications", "Tells you when a checkout is paused")}
+    </div>
+    <div class="darknote">${icon("chip", 28, 1.5)}<div><b>The model runs on this phone.</b> No account, no cloud, no analytics. Works in flight mode.</div></div>`;
+  const how = (ic, t, s) => `<div class="perm"><div class="circle44">${icon(ic)}</div><div class="grow"><div class="t15">${t}</div><div class="t12">${s}</div></div></div>`;
+  const step1 = `
+    <div class="appicon">${icon("chip", 40, 1.6)}</div>
+    <div class="center">
+      <h1>The agent suggests.<br>Your policy decides.</h1>
+      <p>A small model on the phone plans and classifies. Plain code applies your rules, so a wrong guess can't leak anything.</p>
+    </div>
+    <div class="gap8" style="flex-direction:column">
+      ${how("cart", "Checkout shield", "Pauses a checkout when something was added for you. It never taps Pay.")}
+      ${how("lock", "Airlock", "Masks names, IDs and amounts in text and photos before you share them.")}
+      ${how("list", "Decision ledger", "Every decision is written to a hash-chained log on the phone.")}
+    </div>
+    <div class="darknote">${icon("shield", 28, 1.5)}<div><b>INTERNET permission: not declared.</b> Parda cannot send anything. What leaves goes through your share sheet, by your hand.</div></div>`;
+  return blobs([["top:-40px;left:50%;margin-left:-170px", 340, "var(--blue)", .7, 60], ["top:560px;right:-120px", 280, "var(--peach)", .75, 70]]) + `
+    <div class="content enter">
+      ${state.welcomeStep === 0 ? step0 : step1}
+      <div class="cta">
+        <div class="dots" aria-hidden="true"><span class="${state.welcomeStep === 0 ? "on" : ""}"></span><span class="${state.welcomeStep === 1 ? "on" : ""}"></span></div>
+        <button class="btn" data-act="welcomeNext">${state.welcomeStep === 0 ? "Continue" : "Start protecting"}</button>
+      </div>
+    </div>`;
+};
+
+SCREENS.home = () => {
+  const t = Ledger.totals();
+  const rev = [...Ledger.entries].reverse();
+  const lastA = rev.find(e => e.channel === "A"), lastB = rev.find(e => e.channel === "B");
+  const kindCount = {};
+  Ledger.entries.forEach(e => e.kinds.forEach(k => { kindCount[k] = (kindCount[k] || 0) + 1; }));
+  const order = ["BASKET_SNEAKING", "FALSE_URGENCY", "DRIP_PRICING", "CONFIRM_SHAMING", "SUBSCRIPTION_TRAP"];
+  const bar = t.patterns
+    ? order.filter(k => kindCount[k]).map(k => `<span style="flex-grow:${kindCount[k]};background:${KINDS[k].color}"></span>`).join("")
+    : `<span style="flex-grow:1;background:rgba(22,24,29,.08)"></span>`;
+  const legend = t.patterns ? `<div class="legend">${order.filter(k => kindCount[k]).map(k => `<span><i style="background:${KINDS[k].color}"></i>${KINDS[k].label} ${kindCount[k]}</span>`).join("")}</div>` : "";
+  const intercept = lastA ? `
+    <div class="intercept">
+      <div class="grow" style="display:flex;flex-direction:column;gap:6px;min-width:0">
+        <div class="eyebrow">Last intercept</div>
+        <div class="h">${esc(lastA.headline)}</div>
+        <div class="s">${esc(lastA.store)} checkout · ${ago(lastA.time)}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:8px">
+        <div class="amt">${lastA.saved ? "−" + Money.fmt(lastA.saved) : lastA.patterns + " found"}</div>
+        <button class="go-white" data-act="go" data-arg="firewall:history" aria-label="Open the ledger">${icon("chevR", 22, 2)}</button>
+      </div>
+    </div>` : `
+    <div class="intercept">
+      <div class="grow" style="display:flex;flex-direction:column;gap:6px">
+        <div class="eyebrow">No checkout paused yet</div>
+        <div class="h">Try a demo checkout</div>
+        <div class="s">A stand-in store with every trick. The shield reads it like any other app.</div>
+      </div>
+      <button class="go-white" data-act="store" data-arg="fashion" aria-label="Open the demo store">${icon("chevR", 22, 2)}</button>
+    </div>`;
+  const air = lastB
+    ? `<button class="rowcard" data-act="go" data-arg="airlock"><div class="circle44">${icon("lock")}</div><div class="grow"><div class="t15m">${esc(lastB.headline)}</div><div class="t13">Airlock · ${ago(lastB.time)}</div></div>${icon("chevR", 18)}</button>`
+    : `<button class="rowcard" data-act="go" data-arg="airlock"><div class="circle44">${icon("lock")}</div><div class="grow"><div class="t15m">Mask a letter or an ID photo</div><div class="t13">Airlock · nothing shared yet</div></div>${icon("chevR", 18)}</button>`;
+  return blobs([["top:-80px;left:-90px", 300, "var(--blue)", .55, 60], ["top:420px;right:-110px", 280, "var(--peach)", .8, 70]]) + `
+    <div class="content enter">
+      <div class="topbar">
+        <div class="brand">${icon("shield", 22, 2)}parda</div>
+        <div class="gap8">
+          <button class="icon-btn" data-act="go" data-arg="firewall:history" aria-label="Decision ledger">${icon("bell")}</button>
+          <button class="icon-btn" data-act="go" data-arg="settings" aria-label="Settings">${icon("user")}</button>
+        </div>
+      </div>
+      <h1 class="title" style="margin-top:4px">Your checkout<br>shield</h1>
+      <section class="card glass" aria-label="Totals">
+        <div class="topbar">
+          <div class="okline"><span class="dot"></span>Active · on-device${state.flight ? " · flight mode" : ""}</div>
+          <span style="color:#4A4F5A">${icon(state.flight ? "plane" : "chip", 22, 1.6)}</span>
+        </div>
+        <div class="stats">
+          <div class="stat"><div class="v">${t.patterns}</div><div class="k">Dark patterns caught</div></div>
+          <div class="stat"><div class="v">${Money.fmt(t.saved)}</div><div class="k">Saved so far</div></div>
+          <div class="stat"><div class="v">${t.masked}</div><div class="k">Personal fields masked</div></div>
+          <div class="stat"><div class="v">0 B</div><div class="k">Sent to any server</div></div>
+        </div>
+        <div class="pbar" role="img" aria-label="Patterns caught by kind">${bar}</div>
+        ${legend}
+      </section>
+      ${intercept}
+      ${lastA ? `<button class="rowcard" data-act="store" data-arg="fashion"><div class="circle44">${icon("cart")}</div><div class="grow"><div class="t15m">Open a demo store</div><div class="t13">Shopping, food, travel, tickets, groceries</div></div>${icon("chevR", 18)}</button>` : ""}
+      ${air}
+    </div>`;
+};
+
+SCREENS.store = () => {
+  const s = state.store, cart = cartById(s.cartId);
+  const total = cartTotal(cart, s.ticked);
+  const lines = cart.lines.map((l, i) => {
+    const [label, price, kind] = l;
+    if (optional(l)) return `
+      <div class="sline" data-node="line" data-i="${i}" data-label="${esc(label)}">
+        <label><input type="checkbox" data-change="tick" data-arg="${i}" ${s.ticked[i] ? "checked" : ""}><span class="lbl">${esc(label)}</span></label>
+        <span class="price">${esc(price)}</span>
+      </div>`;
+    return `<div class="sline ${kind === "FEE" ? "fee" : ""}" data-node="line" data-i="${i}" data-label="${esc(label)}"><span class="lbl">${esc(label)}</span><span class="price">${esc(price)}</span></div>`;
+  }).join("");
+  const cap = s.phase === "reading"
+    ? `<div class="watchcap"><span class="pulse"></span>Parda is reading this screen</div>`
+    : `<div class="watchcap">${icon("shieldCheck", 16, 2)}${esc(s.note || "Checked on this phone")}</div>`;
+  return `
+    <div class="content enter">
+      <div class="store-top">
+        <button class="back" data-act="go" data-arg="home" aria-label="Back to Parda">${icon("chevL", 20, 2)}</button>
+        <div class="grow"><div class="store-name">${esc(cart.store)} · demo store</div><h2>Checkout</h2></div>
+      </div>
+      <div class="carts" role="group" aria-label="Demo stores">
+        ${CARTS.map(c => `<button data-act="store" data-arg="${c.id}" aria-pressed="${c.id === s.cartId}">${esc(c.store)}</button>`).join("")}
+      </div>
+      ${cap}
+      <div id="storeScreen" style="display:flex;flex-direction:column;gap:14px">
+        ${lines}
+        <div class="stotal"><span>To pay</span><span>${Money.fmt(total)}</span></div>
+        ${(cart.banners || []).map(b => `<div class="banner" data-node="banner" data-countdown="${/\d{1,2}:\d{2}/.test(b) ? 1 : 0}">${esc(b)}</div>`).join("")}
+        <button class="paybtn" data-node="pay" data-act="pay">Pay ${Money.fmt(total)}</button>
+        ${cart.decline ? `<button class="decline" data-node="decline" data-act="pay">${esc(cart.decline)}</button>` : ""}
+      </div>
+      <p class="storenote">A stand-in store with made-up names. On the phone, Parda reads real checkouts through Android's accessibility service, with the phone online as normal.</p>
+    </div>`;
+};
+
+SCREENS.firewall = () => {
+  const tab = state.fw.tab;
+  const seg = `<div class="seg" role="tablist">
+      <button role="tab" aria-selected="${tab === "rules"}" data-act="fwtab" data-arg="rules">Rules</button>
+      <button role="tab" aria-selected="${tab === "history"}" data-act="fwtab" data-arg="history">History</button>
+    </div>`;
+  let body;
+  if (tab === "rules") {
+    const kinds = Object.entries(KINDS).map(([k, v]) => {
+      const a = actionForKind(k);
+      return `<div class="item rule">
+        <span class="dot" style="background:${v.color}"></span>
+        <div class="grow"><div class="t15">${v.label} <span class="code">${v.code}</span></div><div class="t12">${v.hint}</div></div>
+        <button class="chip ${a === "AUTO_REMOVE" ? "on" : ""}" data-act="cycleKind" data-arg="${k}" aria-label="${v.label}: ${CHECKOUT_ACTIONS[a]}. Tap to change.">${CHECKOUT_ACTIONS[a]}</button>
+      </div>`;
+    }).join("");
+    const cats = Object.entries(CATEGORIES).map(([k, v]) => {
+      const a = disclosureFor(k);
+      return `<div class="item">
+        <div class="grow"><div class="t15">${v.label}</div><div class="t12">${v.hint}</div></div>
+        <button class="chip ${a === "BLOCK" ? "on" : ""}" data-act="cycleCat" data-arg="${k}" aria-label="${v.label}: ${DISCLOSURE[a].label}. Tap to change.">${DISCLOSURE[a].chip}</button>
+      </div>`;
+    }).join("");
+    body = `
+      <div class="section-label">At checkout</div>
+      <div class="list">${kinds}</div>
+      <div class="section-label">Before you share</div>
+      <div class="list">${cats}</div>
+      <p class="t12" style="margin:0 4px">Tap an action to change it. One policy drives both boundaries: the Airlock and the checkout shield read the same rules.</p>
+      <div class="section-label">Watching these apps</div>
+      <div class="apps">
+        ${state.watching.map(([n, on], i) => `<button data-act="watch" data-arg="${i}" aria-pressed="${on}">${esc(n)}</button>`).join("")}
+        <button class="add" data-act="addApp">${icon("plus", 14, 2)}Add app</button>
+      </div>
+      ${state.fw.adding ? `<div class="addrow"><input class="field" id="newApp" placeholder="App or category" aria-label="App to watch"><button class="pill" data-act="addAppSave">Add</button></div>` : ""}`;
+  } else {
+    const bad = Ledger.verify();
+    const n = Ledger.entries.length;
+    const rows = [...Ledger.entries].reverse().map(e => `
+      <div class="item">
+        <div class="lg-icon">${icon(e.channel === "A" ? "cart" : "lock", 18)}</div>
+        <div class="grow">
+          <div style="display:flex;gap:6px;align-items:center;margin-bottom:3px"><span class="vchip ${VERDICT_CLASS[e.verdict] || ""}">${e.verdict}</span><span class="t12">${e.channel === "A" ? "Money" : "Data"} · ${clock(e.time)}</span></div>
+          <div class="t13" style="color:var(--ink);font-weight:600">${esc(e.detail)}</div>
+          <div class="lg-meta mono">#${e.seq} · ${e.hash.slice(0, 12)} ← ${e.prevHash.slice(0, 8)}</div>
+        </div>
+        <div class="lg-right">${e.saved ? "−" + Money.fmt(e.saved) : e.masked ? e.masked + " masked" : ""}</div>
+      </div>`).join("");
+    body = `
+      <section class="card glass" style="gap:12px">
+        <div class="chain">
+          <div class="circle44" style="color:${bad === -1 ? "var(--ok-text)" : "#A33A3A"}">${icon(bad === -1 ? "link" : "shieldAlert", 20)}</div>
+          <div class="grow">
+            <div class="t15">${bad === -1 ? `Chain intact · ${n} ${n === 1 ? "entry" : "entries"}` : `Entry #${Ledger.entries[bad].seq} was altered`}</div>
+            <div class="t12">${bad === -1 ? "Append-only. Each entry commits to the SHA-256 of the one before it." : "Its hash no longer matches. An edited or deleted entry always breaks the chain."}</div>
+          </div>
+        </div>
+        ${n ? `<div class="gap8"><button class="pill light" data-act="verify">${icon("refresh", 14, 2)}Verify</button><button class="pill light" data-act="tamper">${state.tampered ? "Undo the edit" : "Try editing an entry"}</button></div>` : ""}
+      </section>
+      <div class="list">${rows || `<div class="empty">No decisions yet. Open a demo checkout or use the Airlock, and every decision lands here, whether or not anything was shared.</div>`}</div>
+      <p class="t12" style="margin:0 4px">Entries hold counts and categories, never the values themselves.</p>`;
+  }
+  return blobs([["top:-60px;right:-90px", 300, "var(--blue)", .6, 60], ["top:470px;left:-120px", 260, "var(--peach)", .7, 70]]) + `
+    <div class="content enter">
+      <div><h1 class="title">Firewall</h1><div class="subtitle">${tab === "rules" ? "One policy, yours, on this phone" : "The decision ledger"}</div></div>
+      ${seg}
+      ${body}
+    </div>`;
+};
+
+function idFields() {
+  const found = classify(ID_TEXT);
+  let lineStart = 0;
+  const lines = ID_TEXT.split("\n").map(l => { const r = [lineStart, lineStart + l.length]; lineStart += l.length + 1; return r; });
+  return ID_FIELDS.map(([key, label, cat], i) => {
+    const det = found.find(d => d.start >= lines[i][0] && d.end <= lines[i][1]) || null;
+    return {key, label, cat: det ? det.cat : cat, value: ID_CARD[key], det};
   });
-});
+}
+function idMaskDefaults() {
+  const m = {};
+  idFields().forEach(f => { m[f.key] = !!f.det && disclosureFor(f.cat) !== "ALLOW"; });
+  return m;
+}
+const idKeep4 = () => disclosureFor("GOV_ID") === "KEEP_LAST_4";
 
-renderPolicy(); renderCart(); renderLedger();
+SCREENS.airlock = () => {
+  const a = state.air;
+  const seg = `<div class="seg" role="tablist">
+      <button role="tab" aria-selected="${a.tab === "text"}" data-act="airtab" data-arg="text">Text</button>
+      <button role="tab" aria-selected="${a.tab === "photo"}" data-act="airtab" data-arg="photo">Photo</button>
+    </div>`;
+  const head = `<div class="topbar">
+      <div><h1 class="title">Airlock</h1><div class="subtitle">Mask it before you share it</div></div>
+      ${a.tab === "text"
+        ? `<button class="icon-btn" data-act="openFile" aria-label="Open a text file">${icon("doc")}</button>`
+        : `<button class="icon-btn" data-act="pickPhoto" aria-label="Pick a photo">${icon("photo")}</button>`}
+    </div>`;
+  const body = a.tab === "text" ? airText() : airPhoto();
+  return blobs([["top:90px;left:-80px", 320, "var(--blue)", .65, 60], ["top:300px;right:-100px", 240, "var(--peach)", .7, 60]]) + `
+    <div class="content enter">${head}${seg}${body}</div>`;
+};
+
+function airText() {
+  const a = state.air, d = a.decision;
+  const chips = suggestions(a.doc).map(([l, q]) => `<button class="pill glassy" data-act="ask" data-arg="${esc(q)}">${esc(l)}</button>`).join("");
+  let result = "";
+  if (a.busy) {
+    result = `<section class="card glass" style="flex-direction:row;align-items:center;gap:12px"><div class="spinner"></div><div class="t15m">Planning on this phone…</div></section>`;
+  } else if (d) {
+    const counts = {};
+    d.result.detections.forEach(x => { counts[x.cat] = (counts[x.cat] || 0) + 1; });
+    const found = Object.keys(counts).length
+      ? Object.entries(counts).map(([k, n]) => `<div class="f"><span class="n">${n}</span><span class="grow">${CATEGORIES[k].label}</span><span class="chip ${disclosureFor(k) === "BLOCK" ? "on" : ""}">${DISCLOSURE[disclosureFor(k)].chip}</span></div>`).join("")
+      : `<div class="t13">Nothing personal found.</div>`;
+    const plan = `<div class="plan">${esc(JSON.stringify(d.plan))}</div>
+      <div class="t12" style="margin-top:-8px">Planned by keyword rules in ${d.ms < 1 ? "under 1" : Math.round(d.ms)} ms. On the phone, Hammer2.1-1.5B writes this call under a GBNF grammar, and these rules are its fallback.</div>`;
+    const foundCard = `<section class="card glass" style="gap:12px"><div class="t15">Found on this phone</div><div class="found">${found}</div></section>`;
+    if (d.kind === "local") {
+      result = `
+        <section class="card glass">
+          <div class="verdict-h"><span class="dot"></span>Answered on this phone</div>
+          <p class="muted">Nothing needed to leave, not even a surrogate. The answer is shown here only.</p>
+          <div class="inner"><pre class="block">${esc(d.answer)}</pre></div>
+          ${plan}
+        </section>${foundCard}`;
+    } else {
+      const withheld = d.result.vault.length;
+      result = `
+        <section class="card dark">
+          <div><div class="eyebrow">Handed back sanitized</div>
+          <div style="font-size:20px;font-weight:700;margin-top:6px">${withheld} ${withheld === 1 ? "value" : "values"} held back</div></div>
+          <p class="muted">${REASONS[d.reason]} Parda made a safe copy for you to take elsewhere. It did not send it, and it has no way to.</p>
+          <div class="outbox"><pre class="block">${sanitizedHtml(d.result)}</pre></div>
+          <div class="gap8" style="flex-wrap:wrap">
+            <button class="pill light" data-act="copyOut">${icon("copy", 15, 2)}Copy</button>
+            <button class="pill light" data-act="shareOut">${icon("share", 15, 2)}Share…</button>
+            <button class="pill outline-dark" data-act="go" data-arg="vault">${icon("key", 15, 2)}Vault</button>
+          </div>
+          ${plan}
+        </section>
+        <section class="card glass" style="gap:12px">
+          <div><div class="t15">Bring the reply back</div><div class="t12">Paste what the outside model said. Real values go back in here, on the phone.</div></div>
+          <textarea class="field" style="min-height:96px" data-input="reply" aria-label="Reply from outside">${esc(a.reply)}</textarea>
+          <button class="btn sm" data-act="restore">Restore real values</button>
+          ${a.restored ? `<div class="inner"><pre class="block" style="font-family:inherit;font-size:14px">${a.restored.html}</pre></div>
+            <div class="t12">${a.restored.restored} ${a.restored.restored === 1 ? "value" : "values"} restored from the vault. Blocked values never left, so they cannot come back.</div>` : ""}
+        </section>${foundCard}`;
+    }
+  }
+  return `
+    <section class="card glass" style="gap:12px">
+      <textarea class="field" data-input="doc" aria-label="Text you are about to share" spellcheck="false">${esc(a.doc)}</textarea>
+      <div class="gap8"><button class="pill light" data-act="sample">Salary letter</button><button class="pill light" data-act="clearDoc">Clear</button></div>
+    </section>
+    <div class="qchips">${chips}</div>
+    <div class="ask">
+      <input class="field" data-input="q" value="${esc(a.q)}" placeholder="Ask about this text" aria-label="Your question">
+      <button class="send" data-act="askTyped" aria-label="Ask">${icon("arrow", 22, 2)}</button>
+    </div>
+    <div id="airResult" style="display:flex;flex-direction:column;gap:16px">${result}</div>`;
+}
+
+function airPhoto() {
+  const a = state.air;
+  if (!a.mask) a.mask = idMaskDefaults();
+  const f = Object.fromEntries(idFields().map(x => [x.key, x]));
+  const keep4 = idKeep4();
+  const val = (key, w) => {
+    const v = f[key].value;
+    if (!a.mask[key]) return `<span>${esc(v)}</span>`;
+    if (key === "id" && keep4) return `<span class="bar" style="width:${w}px"></span><span>${esc(v.slice(-4))}</span>`;
+    return `<span class="bar" style="width:${w}px"></span>`;
+  };
+  const masked = Object.values(a.mask).filter(Boolean).length;
+  const row = (key, extra = "") => `
+    <label class="maskrow"><span class="grow t15m">${f[key].label}${extra}</span>
+      <input type="checkbox" data-change="mask" data-arg="${key}" ${a.mask[key] ? "checked" : ""} aria-label="Mask ${f[key].label}"></label>`;
+  return `
+    <div class="idwrap">
+      <div class="idcard" aria-label="ID card preview">
+        <div class="idhead"><span>GOVERNMENT OF INDIA · SAMPLE</span><span>${masked} masked</span></div>
+        <div class="top">
+          <div class="idphoto">${icon("user", 34, 1.5)}</div>
+          <div class="idf">
+            <div><div class="k">Name</div><div class="v">${val("name", 110)}</div></div>
+            <div><div class="k">ID number</div><div class="v">${val("id", keep4 ? 96 : 138)}</div></div>
+            <div><div class="k">Date of birth</div><div class="v">${val("dob", 74)}</div></div>
+          </div>
+        </div>
+        <div class="idf"><div><div class="k">Address</div><div class="v" style="flex-wrap:wrap">${a.mask.address ? `<span class="bar" style="width:100%"></span><span class="bar" style="width:60%;margin-top:2px"></span>` : `<span style="font-weight:600;font-size:13px">${esc(f.address.value)}</span>`}</div></div></div>
+      </div>
+    </div>
+    <div class="list">
+      ${row("id", ` <button class="chip ${keep4 ? "on" : ""}" data-act="keep4" style="margin-left:4px">${keep4 ? "keeps last 4" : "all hidden"}</button>`)}
+      ${row("dob")}${row("address")}${row("name")}
+    </div>
+    <p class="t12" style="margin:-4px 4px 0">The same detectors and policy as text decide what to cover. On the phone, ML Kit reads the photo on the device; here a sample card stands in. The masked copy is a new flattened image, so the photo's metadata is dropped.</p>
+    <div class="gap8" style="align-items:center">
+      <button class="btn" data-act="shareId">Share masked copy</button>
+      <button class="icon-btn" style="width:56px;height:56px" data-act="saveId" aria-label="Save masked copy">${icon("download")}</button>
+    </div>`;
+}
+
+SCREENS.vault = () => {
+  const v = state.vault;
+  const tag = e => e.act === "SURROGATE" ? `<span class="chip ok">Restores</span>` : e.act === "BLOCK" ? `<span class="chip on">Blocked</span>` : `<span class="chip warn">Last 4</span>`;
+  const rows = v.map(e => `<div class="vrow"><span class="vtok">${esc(e.token)}</span><span class="vreal">${esc(e.real)}</span>${tag(e)}</div>`).join("");
+  return blobs([["top:60px;right:-90px", 300, "var(--blue)", .6, 60], ["top:420px;left:-110px", 260, "var(--peach)", .7, 70]]) + `
+    <div class="content enter">
+      <div class="topbar">
+        <button class="icon-btn" data-act="go" data-arg="airlock" aria-label="Back to Airlock">${icon("chevL", 20, 2)}</button>
+        <span></span>
+      </div>
+      <div><h1 class="title">Vault</h1><div class="subtitle">Real values, held on this phone</div></div>
+      <section class="card dark" style="flex-direction:row;align-items:center;gap:14px">
+        ${icon("key", 26, 1.6)}
+        <div class="muted" style="color:#D5D8DE"><b style="color:#fff">Never shared, never saved to disk.</b> When a reply comes back with a token, Parda swaps the real value in here.</div>
+      </section>
+      <div class="list">${rows || `<div class="empty">The vault is empty. Ask the Airlock something it has to hand back, and the values it held back appear here.</div>`}</div>
+      ${v.length ? `<button class="btn ghost" data-act="clearVault">Clear the vault</button>` : ""}
+    </div>`;
+};
+
+SCREENS.settings = () => {
+  const gbnf = $("#gbnf").textContent;
+  return blobs([["top:-60px;left:-90px", 300, "var(--blue)", .55, 60], ["top:480px;right:-110px", 280, "var(--peach)", .75, 70]]) + `
+    <div class="content enter">
+      <div><h1 class="title">Settings</h1><div class="subtitle">Everything stays on this phone</div></div>
+      <section class="card dark" aria-label="Egress receipt">
+        <div class="eyebrow">Egress receipt</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div><div style="font-size:28px;font-weight:700;letter-spacing:-.02em">0 B</div><div class="muted">sent by Parda</div></div>
+          <div><div style="font-size:17px;font-weight:700;line-height:1.3;margin-top:6px">not declared</div><div class="muted">android.permission.INTERNET</div></div>
+        </div>
+        <p class="muted">On the phone, CI fails any build that declares the permission, and this card reads the OS byte counter, so the zero is measured, not claimed.</p>
+      </section>
+      <div class="list">
+        <div class="item">
+          <div class="circle44">${icon("plane")}</div>
+          <div class="grow"><div class="t15">Flight mode</div><div class="t12">Turn it on. Every screen still works.</div></div>
+          <button class="switch" role="switch" aria-checked="${state.flight}" aria-label="Flight mode" data-act="flight"></button>
+        </div>
+      </div>
+      <section class="card glass" style="gap:12px">
+        <div class="chain">
+          <div class="circle44">${icon("chip")}</div>
+          <div class="grow"><div class="t15">Hammer2.1-1.5B</div><div class="t12">Q4_K_M · llama.cpp on the phone's CPU</div></div>
+        </div>
+        <p class="muted">The model only plans. Its output is held to a grammar with two calls and fixed arguments, so it cannot write free text and cannot carry your data. If its plan can't be read, Parda falls back to the safe path. In this web prototype the keyword rules (the phone's fallback) do the planning.</p>
+        <details class="gbnf"><summary>${icon("chevR", 14, 2)}Show the grammar</summary><pre class="mono">${esc(gbnf)}</pre></details>
+      </section>
+      <div class="list">
+        <button class="item" data-act="replay"><div class="circle44">${icon("refresh")}</div><div class="grow"><div class="t15m">Replay the welcome</div></div>${icon("chevR", 18)}</button>
+        <button class="item" data-act="reset"><div class="circle44">${icon("list")}</div><div class="grow"><div class="t15m">Reset the demo</div><div class="t12">Clears the ledger, the vault and your rules</div></div>${icon("chevR", 18)}</button>
+      </div>
+      <p class="t12" style="margin:0 4px">The agent plans and classifies; deterministic code decides and executes. Parda never taps Pay, and every fix is offered, never forced. Team GOLD.</p>
+    </div>`;
+};
+
+/* ============================== RENDER ============================== */
+function render({keepScroll = false} = {}) {
+  const scr = $("#screen");
+  const top = scr.scrollTop;
+  scr.className = "screen" + (state.screen === "store" ? " store-bg" : "") + (state.screen === "welcome" ? " welcome" : "") + (state.screen === "store" ? " store" : "");
+  scr.innerHTML = SCREENS[state.screen]();
+  if (keepScroll) scr.scrollTop = top; else scr.scrollTop = 0;
+  // The entrance animation plays once per screen, not on every re-render.
+  if (keepScroll) scr.querySelectorAll(".enter").forEach(el => el.classList.remove("enter"));
+  renderChrome();
+  renderSheet();
+}
+function go(screen) {
+  if (state.screen === "store" && screen !== "store") stopCountdown();
+  state.screen = screen;
+  render();
+  $("#screen").focus({preventScroll: true});
+}
+
+/* ============================== CHANNEL A: FLOW ============================== */
+let countdown = null, scanTimer = null;
+function stopCountdown() { clearInterval(countdown); countdown = null; clearTimeout(scanTimer); }
+function openStore(cartId) {
+  stopCountdown();
+  const cart = cartById(cartId);
+  const ticked = cart.lines.map(l => l[2] === "TICKED");
+  state.store = {cartId, ticked, served: ticked.slice(), phase: "reading", note: ""};
+  state.sheet = null;
+  state.screen = "store";
+  render();
+  startCountdown();
+  scanTimer = setTimeout(runScan, 900);
+}
+function startCountdown() {
+  const cart = cartById(state.store.cartId);
+  const b = (cart.banners || []).find(x => /\d{1,2}:\d{2}/.test(x));
+  if (!b) return;
+  const [, mm, ss] = b.match(/(\d{1,2}):(\d{2})/);
+  const full = +mm * 60 + +ss;
+  let left = full;
+  countdown = setInterval(() => {
+    left = left <= 1 ? full : left - 1; // the timer quietly resets: that is the trick
+    const el = document.querySelector('[data-countdown="1"]');
+    if (el) el.textContent = b.replace(/\d{1,2}:\d{2}/, `${String(Math.floor(left / 60)).padStart(2, "0")}:${String(left % 60).padStart(2, "0")}`);
+  }, 1000);
+}
+function runScan() {
+  const s = state.store, cart = cartById(s.cartId);
+  const scan = scanScreen($("#storeScreen"));
+  const shown = scan.findings.filter(f => actionForKind(f.kind) !== "IGNORE");
+  s.phase = "done";
+  if (!shown.length) {
+    s.note = "Checked on this phone · nothing to flag";
+    render({keepScroll: true});
+    toast(`Parda read ${cart.store}'s checkout and found nothing you didn't choose.`);
+    return;
+  }
+  // Only a box the scanner itself identified may be unticked (CheckoutGate.mayUntick).
+  shown.forEach(f => {
+    f.action = actionForKind(f.kind);
+    if (f.fixable && f.action === "AUTO_REMOVE") { s.ticked[f.nodeId] = false; f.auto = true; }
+  });
+  const pauses = shown.some(f => f.action === "AUTO_REMOVE" || f.action === "ASK_ME");
+  const sel = {};
+  shown.filter(f => f.fixable).forEach(f => { sel[f.nodeId] = true; });
+  state.sheet = {findings: shown, sel, readOnly: !pauses};
+  if (!pauses) {
+    Ledger.append({channel: "A", verdict: "flagged", detail: `${cart.store}: ${shown.length} ${shown.length === 1 ? "trick" : "tricks"} flagged, nothing changed`,
+      patterns: shown.length, kinds: shown.map(f => f.kind), store: cart.store, headline: `${shown.length} tricks flagged`});
+    s.note = `Parda flagged ${shown.length} ${shown.length === 1 ? "thing" : "things"}`;
+    state.sheet = null;
+    render({keepScroll: true});
+    toast(`Flag only: ${shown.map(f => KINDS[f.kind].label.toLowerCase()).join(", ")}. Nothing paused.`, 3200);
+    return;
+  }
+  render({keepScroll: true});
+}
+function sheetTotals() {
+  const s = state.store, cart = cartById(s.cartId), sh = state.sheet;
+  const old = cartTotal(cart, s.served);
+  const next = s.ticked.slice();
+  sh.findings.filter(f => f.fixable).forEach(f => { next[f.nodeId] = !sh.sel[f.nodeId]; });
+  const recurringAvoided = sh.findings.filter(f => f.fixable && sh.sel[f.nodeId]).reduce((t, f) => t + f.recurring, 0);
+  const recurringKept = sh.findings.filter(f => f.fixable && !sh.sel[f.nodeId]).reduce((t, f) => t + f.recurring, 0);
+  return {old, now: cartTotal(cart, next), recurringAvoided, recurringKept};
+}
+function renderSheet() {
+  const ov = $("#overlay"), sh = state.sheet;
+  if (!sh || state.screen !== "store") { ov.hidden = true; ov.innerHTML = ""; return; }
+  const t = sheetTotals();
+  const fixable = sh.findings.filter(f => f.fixable);
+  const rows = sh.findings.map(f => {
+    const k = KINDS[f.kind];
+    if (f.fixable) {
+      const amount = f.cost ? Money.fmt(f.cost) : f.recurring ? Money.fmt(f.recurring) + "/mo" : "";
+      const sub = f.auto ? "Removed by your rule · untick to keep it" : f.kind === "SUBSCRIPTION_TRAP" ? `Free now, then ${Money.fmt(f.recurring)}/month` : "Pre-ticked add-on · opt-out, not opt-in";
+      return `<label class="srow ${f.auto ? "auto" : ""}">
+        <span class="dot" style="background:${k.color}"></span>
+        <div class="grow" style="min-width:0"><div class="t15m">${esc(f.evidence)}</div><div class="t12">${sub} · <span class="tag">${k.code}</span></div></div>
+        <span class="amt">${amount}</span>
+        <input type="checkbox" data-change="sel" data-arg="${f.nodeId}" ${sh.sel[f.nodeId] ? "checked" : ""} aria-label="Remove ${esc(f.evidence)}">
+      </label>`;
+    }
+    const map = {
+      DRIP_PRICING: [`${esc(f.evidence)}`, `Shown only at the last step · can't be removed`, `<span class="amt">${Money.fmt(f.cost)}</span>`],
+      FALSE_URGENCY: [`“${esc(f.evidence)}”`, "Countdown resets when the page reloads", `<span class="chip warn">Ignore it</span>`],
+      CONFIRM_SHAMING: [`“${esc(f.evidence)}”`, "Declining is worded to make you feel guilty", `<span class="chip warn">Ignore it</span>`],
+    }[f.kind] || [esc(f.evidence), k.hint, ""];
+    return `<div class="srow"><span class="dot" style="background:${k.color}"></span>
+      <div class="grow" style="min-width:0"><div class="t15m">${map[0]}</div><div class="t12">${map[1]} · <span class="tag">${k.code}</span></div></div>${map[2]}</div>`;
+  }).join("");
+  const anySel = fixable.some(f => sh.sel[f.nodeId]);
+  ov.classList.toggle("still", !!sh.rendered);
+  sh.rendered = true;
+  ov.hidden = false;
+  ov.innerHTML = `
+    <div class="scrim" data-act="keepAll"></div>
+    ${blobs([["top:250px;left:-60px", 260, "var(--blue)", .7, 60]])}
+    <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+      <div class="grabber"></div>
+      <div class="sheet-head">
+        <div class="sheet-icon">${icon("shieldAlert", 24)}</div>
+        <div><div class="sheet-title" id="sheetTitle">Parda paused this checkout</div>
+        <div class="t13">${sh.findings.length} ${sh.findings.length === 1 ? "thing" : "things"} you didn’t ask for · checked on this phone</div></div>
+      </div>
+      <div class="sheet-rows">${rows}</div>
+      <div class="youpay"><span class="k">You pay</span>${t.old !== t.now ? `<span class="old">${Money.fmt(t.old)}</span>` : ""}<span class="new">${Money.fmt(t.now)}</span></div>
+      ${t.recurringAvoided ? `<div class="recur">Plus <b>${Money.fmt(t.recurringAvoided)}/month</b> you didn't agree to, avoided.</div>`
+        : t.recurringKept ? `<div class="recur">Keeps a trial that renews at ${Money.fmt(t.recurringKept)}/month.</div>` : ""}
+      <button class="btn" data-act="applySheet">${fixable.length ? (anySel ? "Remove add-ons & continue" : "Continue with these") : "Got it, continue"}</button>
+      <button class="btn ghost" data-act="keepAll">Keep everything</button>
+    </div>`;
+}
+function headlineFor(removed) {
+  const top = removed.slice().sort((a, b) => (b.cost + b.recurring) - (a.cost + a.recurring))[0];
+  const name = top.evidence.replace(/s*(.*)$/, "");
+  return removed.length > 1 ? `${name} and ${removed.length - 1} more, removed` : `${name} was pre-ticked`;
+}
+function applySheet(removeSelected) {
+  const s = state.store, sh = state.sheet, cart = cartById(s.cartId);
+  const fixable = sh.findings.filter(f => f.fixable);
+  const removed = [];
+  fixable.forEach(f => {
+    const remove = removeSelected && sh.sel[f.nodeId];
+    s.ticked[f.nodeId] = !remove;
+    if (remove) removed.push(f);
+  });
+  const saved = removed.reduce((t, f) => t + f.cost, 0);
+  const rec = removed.reduce((t, f) => t + f.recurring, 0);
+  const kinds = sh.findings.map(f => f.kind);
+  if (removed.length) {
+    Ledger.append({channel: "A", verdict: "fixed", saved, patterns: sh.findings.length, kinds, store: cart.store,
+      headline: headlineFor(removed),
+      detail: `${cart.store}: unticked ${removed.length} ${removed.length === 1 ? "item" : "items"} you didn't choose; ${Money.fmt(saved)} kept${rec ? `, ${Money.fmt(rec)}/month avoided` : ""}. Pay left to you.`});
+    s.note = `Parda removed ${removed.length} · Pay is still yours`;
+  } else {
+    Ledger.append({channel: "A", verdict: removeSelected ? "flagged" : "kept", patterns: sh.findings.length, kinds, store: cart.store,
+      headline: `${sh.findings.length} tricks shown to you`,
+      detail: `${cart.store}: ${sh.findings.length} ${sh.findings.length === 1 ? "trick" : "tricks"} shown; you kept the cart as served.`});
+    s.note = "You kept everything · noted in the ledger";
+  }
+  state.sheet = null;
+  render({keepScroll: true});
+}
+
+/* ============================== CHANNEL B: FLOW ============================== */
+function ask(question) {
+  const a = state.air;
+  if (!a.doc.trim()) { toast("Paste or open some text first."); return; }
+  a.q = question; a.busy = true; a.decision = null; a.restored = null;
+  render({keepScroll: true});
+  setTimeout(() => {
+    const d = disclosureGate(a.doc, question);
+    a.busy = false; a.decision = d;
+    const n = d.result.detections.length;
+    if (d.kind === "local") {
+      Ledger.append({channel: "B", verdict: "held locally", headline: "Answered on the phone",
+        detail: `${n} personal ${n === 1 ? "item" : "items"} found; the local agent answered (${d.plan.arguments.task}), nothing prepared to send.`});
+    } else {
+      state.vault = d.result.vault;
+      const blocked = d.result.vault.filter(v => v.act === "BLOCK").length;
+      Ledger.append({channel: "B", verdict: "handed back", masked: d.result.vault.length, headline: `${d.result.vault.length} values held back from a question`,
+        detail: `${d.result.vault.length} held back (${blocked} blocked); sanitized copy handed to you, nothing transmitted.`});
+    }
+    render({keepScroll: true});
+    const res = $("#airResult"), scr = $("#screen");
+    if (res) scr.scrollTo({top: Math.max(0, res.offsetTop - 70), behavior: "smooth"});
+  }, 450);
+}
+function drawMaskedId() {
+  const a = state.air, f = Object.fromEntries(idFields().map(x => [x.key, x])), keep4 = idKeep4();
+  const c = document.createElement("canvas");
+  c.width = 860; c.height = 540;
+  const g = c.getContext("2d");
+  g.fillStyle = "#FFFFFF"; g.beginPath(); g.roundRect(0, 0, 860, 540, 36); g.fill();
+  g.fillStyle = "#6B707A"; g.font = "800 20px Manrope, sans-serif"; g.fillText("GOVERNMENT OF INDIA · SAMPLE", 48, 70);
+  g.fillStyle = "#E6E9EF"; g.beginPath(); g.roundRect(48, 104, 170, 210, 20); g.fill();
+  const field = (label, key, x, y, w) => {
+    g.fillStyle = "#6B707A"; g.font = "600 18px Manrope, sans-serif"; g.fillText(label.toUpperCase(), x, y);
+    g.fillStyle = "#1C1E24"; g.font = "700 30px Manrope, sans-serif";
+    const v = f[key].value;
+    if (!a.mask[key]) { g.fillText(v, x, y + 40); return; }
+    if (key === "id" && keep4) { g.beginPath(); g.roundRect(x, y + 14, 220, 30, 8); g.fill(); g.fillText(v.slice(-4), x + 236, y + 40); return; }
+    g.beginPath(); g.roundRect(x, y + 14, w, 30, 8); g.fill();
+    if (key === "address") { g.beginPath(); g.roundRect(x, y + 54, w * .6, 30, 8); g.fill(); }
+  };
+  field("Name", "name", 250, 130, 280);
+  field("ID number", "id", 250, 210, 320);
+  field("Date of birth", "dob", 250, 290, 180);
+  if (a.mask.address) field("Address", "address", 48, 380, 764);
+  else { g.fillStyle = "#6B707A"; g.font = "600 18px Manrope, sans-serif"; g.fillText("ADDRESS", 48, 380); g.fillStyle = "#1C1E24"; g.font = "700 24px Manrope, sans-serif"; g.fillText(f.address.value, 48, 416); }
+  return new Promise(res => c.toBlob(res, "image/png"));
+}
+async function handOverId(share) {
+  const a = state.air;
+  const n = Object.values(a.mask).filter(Boolean).length;
+  const blob = await drawMaskedId();
+  const file = new File([blob], "parda-masked-id.png", {type: "image/png"});
+  let how = "saved";
+  if (share && navigator.canShare && navigator.canShare({files: [file]})) {
+    try { await navigator.share({files: [file], title: "Masked ID"}); how = "shared"; } catch { return; }
+  } else {
+    const url = URL.createObjectURL(blob);
+    Object.assign(document.createElement("a"), {href: url, download: file.name}).click();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  }
+  Ledger.append({channel: "B", verdict: "handed back", masked: n, headline: "ID number masked before sharing",
+    detail: `ID photo: ${n} ${n === 1 ? "field" : "fields"} covered; a new flattened image ${how} by you, original untouched.`});
+  toast(how === "shared" ? "Masked copy handed to your share sheet." : "Masked copy saved. The original photo is untouched.");
+}
+
+/* ============================== EVENTS ============================== */
+const ACTIONS = {
+  go(arg) {
+    const [screen, sub] = arg.split(":");
+    if (screen === "firewall" && sub) state.fw.tab = sub;
+    go(screen);
+  },
+  perm(k) { state.perms[k] = true; render({keepScroll: true}); },
+  welcomeNext() {
+    if (state.welcomeStep === 0) { state.welcomeStep = 1; render(); }
+    else { state.welcomeStep = 0; go("home"); }
+  },
+  store(id) { openStore(id); },
+  tick(i, el) { state.store.ticked[+i] = el.checked; render({keepScroll: true}); },
+  pay() { toast("This is a stand-in store, so nothing is charged. Parda never taps Pay."); },
+  sel(id, el) { state.sheet.sel[id] = el.checked; renderSheet(); },
+  applySheet() { applySheet(true); },
+  keepAll() { applySheet(false); },
+  fwtab(t) { state.fw.tab = t; render(); },
+  cycleKind(k) {
+    const order = KINDS[k].fixable ? ["AUTO_REMOVE", "ASK_ME", "FLAG_ONLY", "IGNORE"] : ["ASK_ME", "FLAG_ONLY", "IGNORE"];
+    const cur = actionForKind(k);
+    state.policy.checkout[k] = order[(order.indexOf(cur) + 1) % order.length];
+    render({keepScroll: true});
+  },
+  cycleCat(k) {
+    const order = ["BLOCK", "SURROGATE", "KEEP_LAST_4", "ALLOW"];
+    state.policy.disclosure[k] = order[(order.indexOf(disclosureFor(k)) + 1) % order.length];
+    state.air.mask = null;
+    render({keepScroll: true});
+  },
+  watch(i) { state.watching[+i][1] = !state.watching[+i][1]; render({keepScroll: true}); },
+  addApp() { state.fw.adding = true; render({keepScroll: true}); $("#newApp").focus(); },
+  addAppSave() {
+    const v = $("#newApp").value.trim();
+    if (v) state.watching.push([v, true]);
+    state.fw.adding = false; render({keepScroll: true});
+  },
+  verify() {
+    const bad = Ledger.verify();
+    toast(bad === -1 ? `All ${Ledger.entries.length} entries chain correctly.` : `Entry #${Ledger.entries[bad].seq} does not match its hash.`);
+    render({keepScroll: true});
+  },
+  tamper() {
+    const e = Ledger.entries[0];
+    if (state.tampered) { e.detail = state.tampered; state.tampered = null; }
+    else { state.tampered = e.detail; e.detail = /\d/.test(e.detail) ? e.detail.replace(/\d+/, d => String(+d + 1)) : e.detail + " (edited)"; toast(`Changed one number in entry #${e.seq}. The chain notices.`); }
+    render({keepScroll: true});
+  },
+  airtab(t) { state.air.tab = t; render({keepScroll: true}); },
+  ask(q) { ask(q); },
+  askTyped() { const q = state.air.q.trim(); if (q) ask(q); else toast("Type a question, or tap one of the suggestions."); },
+  sample() { Object.assign(state.air, {doc: SAMPLE_LETTER, decision: null, restored: null, q: ""}); render({keepScroll: true}); },
+  clearDoc() { Object.assign(state.air, {doc: "", decision: null, restored: null, q: ""}); render({keepScroll: true}); },
+  async copyOut() { if (await copyText(state.air.decision.outbound)) toast("Sanitized copy is on your clipboard. Parda sent nothing."); },
+  async shareOut() {
+    const text = state.air.decision.outbound;
+    if (navigator.share) { try { await navigator.share({text}); } catch {} }
+    else if (await copyText(text)) toast("No share sheet in this browser, so it's on your clipboard instead.");
+  },
+  restore() { state.air.restored = rehydrate(state.air.reply, state.vault); render({keepScroll: true}); },
+  openFile() {
+    const inp = Object.assign(document.createElement("input"), {type: "file", accept: ".txt,.csv,.md,.json,text/*"});
+    inp.onchange = async () => {
+      const file = inp.files[0]; if (!file) return;
+      Object.assign(state.air, {doc: (await file.text()).slice(0, 200000), decision: null, restored: null, q: ""});
+      render({keepScroll: true}); toast(`Read ${file.name} on this device.`);
+    };
+    inp.click();
+  },
+  pickPhoto() { toast("On the phone, ML Kit reads your photo on the device. Here, the sample card stands in.", 3400); },
+  mask(k, el) { state.air.mask[k] = el.checked; render({keepScroll: true}); },
+  keep4(_, el, ev) {
+    ev.preventDefault();
+    state.policy.disclosure.GOV_ID = idKeep4() ? "BLOCK" : "KEEP_LAST_4";
+    render({keepScroll: true});
+    toast(`Firewall updated: Government ID → ${DISCLOSURE[state.policy.disclosure.GOV_ID].label}.`);
+  },
+  shareId() { handOverId(true); },
+  saveId() { handOverId(false); },
+  clearVault() { state.vault = []; render(); },
+  flight() {
+    state.flight = !state.flight;
+    render({keepScroll: true});
+    toast(state.flight ? "Flight mode on. Parda keeps working, because it never needed the network." : "Flight mode off.");
+  },
+  replay() { state.welcomeStep = 0; go("welcome"); },
+  reset() {
+    Ledger.entries.length = 0;
+    Object.assign(state, {policy: DEFAULT_POLICY(), vault: [], tampered: null, sheet: null, store: null});
+    Object.assign(state.air, {doc: SAMPLE_LETTER, q: "", decision: null, restored: null, mask: null, reply: SAMPLE_REPLY});
+    toast("Demo reset."); go("home");
+  },
+  step(s) {
+    ({
+      welcome: () => { state.welcomeStep = 0; go("welcome"); },
+      store: () => openStore("fashion"),
+      ledger: () => { state.fw.tab = "history"; go("firewall"); },
+      hard: () => { Object.assign(state.air, {tab: "text", doc: SAMPLE_LETTER}); go("airlock"); ask(HARD_Q); },
+      photo: () => { state.air.tab = "photo"; go("airlock"); },
+      vault: () => go("vault"),
+      flight: () => { state.flight = true; go("settings"); toast("Flight mode on. Everything still works."); },
+    })[s]();
+  },
+};
+document.addEventListener("click", ev => {
+  const t = ev.target.closest("[data-act]");
+  if (!t || t.tagName === "INPUT") return;
+  ACTIONS[t.dataset.act](t.dataset.arg, t, ev);
+});
+document.addEventListener("change", ev => {
+  const t = ev.target.closest("[data-change]");
+  if (t) ACTIONS[t.dataset.change](t.dataset.arg, t, ev);
+});
+document.addEventListener("input", ev => {
+  const t = ev.target.closest("[data-input]");
+  if (!t) return;
+  const k = t.dataset.input;
+  if (k === "doc") { state.air.doc = t.value; }
+  else if (k === "q") state.air.q = t.value;
+  else if (k === "reply") state.air.reply = t.value;
+});
+document.addEventListener("keydown", ev => {
+  if (ev.key === "Enter" && ev.target.matches('[data-input="q"]')) { ev.preventDefault(); ACTIONS.askTyped(); }
+  if (ev.key === "Enter" && ev.target.id === "newApp") { ev.preventDefault(); ACTIONS.addAppSave(); }
+  if (ev.key === "Escape" && state.sheet) ACTIONS.keepAll();
+});
+function tickClock() {
+  const d = new Date();
+  $("#clock").textContent = `${d.getHours() % 12 || 12}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+tickClock();
+setInterval(tickClock, 15000);
+
+/* ============================== SELF-TEST (open with #selftest) ============================== */
+function selfTest() {
+  const results = [];
+  const check = (name, ok, got) => results.push({name, ok: !!ok, got: ok ? undefined : got});
+  check("sha256 abc", sha256("abc") === "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad", sha256("abc"));
+  const found = classify(SAMPLE_LETTER).map(d => d.cat + "=" + d.value);
+  const want = ["PERSON_NAME=Rajesh Kumar", "MONEY_AMOUNT=₹18,40,000", "BANK_ACCOUNT=50100234567891", "GOV_ID=ABCPK1234M",
+    "ADDRESS=12-4-89, Kondapur Main Road, Hyderabad 500084", "EMAIL=rajesh.kumar@example.com", "PHONE=+91 98490 12345"];
+  check("letter detections", JSON.stringify(found) === JSON.stringify(want), found);
+  const s = sanitize(SAMPLE_LETTER);
+  check("sanitized has tokens", s.sanitized.includes("<PERSON_1>") && s.sanitized.includes("<AMOUNT_1>") && s.sanitized.includes(BLOCKED) && !s.sanitized.includes("ABCPK1234M"), s.sanitized);
+  check("rehydrate", rehydrate("<AMOUNT_1> for PERSON_1", s.vault).text === "₹18,40,000 for Rajesh Kumar", rehydrate("<AMOUNT_1> for PERSON_1", s.vault).text);
+  check("keepLast4", keepLast4("7391 6305 4821") === "XXXX XXXX 4821", keepLast4("7391 6305 4821"));
+  check("aadhaar valid", Checksums.verhoeff(digitsOnly(AADHAAR)), AADHAAR);
+  check("id fields detected", idFields().every(f => f.det), idFields().map(f => f.key + ":" + (f.det && f.det.cat)));
+  check("plan easy", Agent.plan("Summarise the key terms of this letter in three lines.").name === "answer_locally");
+  check("plan hard", Agent.plan(HARD_Q).arguments.reason === "needs_outside_knowledge");
+  check("money fmt", Money.fmt(184000000) === "₹18,40,000" && Money.fmt(7080) === "₹70.80", Money.fmt(7080));
+  // Scan every demo cart through the real store DOM.
+  const expect = {fashion: [15900, 29900, 6], food: [3000, 14900, 6], flight: [30900, 0, 5], movie: [2900, 0, 3], grocery: [2000, 9900, 5], honest: [0, 0, 0]};
+  for (const c of CARTS) {
+    const ticked = c.lines.map(l => l[2] === "TICKED");
+    state.store = {cartId: c.id, ticked, served: ticked.slice(), phase: "done"};
+    state.screen = "store";
+    $("#screen").innerHTML = SCREENS.store();
+    const r = scanScreen($("#storeScreen"));
+    const rec = r.findings.filter(f => f.fixable).reduce((t, f) => t + f.cost, 0);
+    const mo = r.findings.reduce((t, f) => t + f.recurring, 0);
+    const got = [rec, mo, r.findings.length];
+    check("scan " + c.id, JSON.stringify(got) === JSON.stringify(expect[c.id]), {got, kinds: r.findings.map(f => f.kind)});
+  }
+  Ledger.append({channel: "A", verdict: "fixed", detail: "test 1", saved: 100});
+  Ledger.append({channel: "B", verdict: "held locally", detail: "test 2"});
+  check("ledger intact", Ledger.verify() === -1);
+  Ledger.entries[0].detail = "test 9";
+  check("ledger tamper caught", Ledger.verify() === 0);
+  Ledger.entries.length = 0;
+  state.store = null; state.screen = "welcome";
+  const failed = results.filter(r => !r.ok);
+  document.body.setAttribute("data-selftest", failed.length ? "FAIL" : "PASS");
+  const pre = document.createElement("pre");
+  pre.id = "selftest";
+  pre.textContent = JSON.stringify({passed: results.length - failed.length, failed}, null, 1);
+  document.body.append(pre);
+}
+
+if (location.hash === "#selftest") selfTest();
+render();
+
+/* Deep links for rehearsing the demo, e.g. index.html#go=store,apply,hard,home */
+const DEEP = {
+  ...Object.fromEntries(["welcome", "store", "ledger", "hard", "photo", "vault", "flight"].map(s => [s, () => ACTIONS.step(s)])),
+  home: () => go("home"), settings: () => go("settings"), airlock: () => { state.air.tab = "text"; go("airlock"); },
+  firewall: () => { state.fw.tab = "rules"; go("firewall"); },
+  easy: () => { state.air.tab = "text"; go("airlock"); ask("Summarise the key terms of this letter in three lines."); },
+  apply: () => { if (state.sheet) applySheet(true); },
+};
+const deep = (location.hash.match(/^#go=([\w,]+)/) || [])[1];
+if (deep) deep.split(",").forEach((s, i) => setTimeout(() => DEEP[s] && DEEP[s](), i * 1300));
 </script>
 </body>
 </html>

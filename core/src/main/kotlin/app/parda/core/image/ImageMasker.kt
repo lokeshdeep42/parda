@@ -17,6 +17,11 @@ data class OcrWord(val text: String, val box: Box)
 
 data class OcrLine(val words: List<OcrWord>)
 
+/** Something in the picture that is not text, found by an on-device detector: a face or a QR code. */
+data class ImageRegion(val kind: Kind, val box: Box) {
+    enum class Kind { FACE, CODE }
+}
+
 /** One piece of personal data found in the image, and the rectangles that cover it. */
 data class MaskedField(
     val category: DataCategory,
@@ -40,23 +45,36 @@ data class ImageMaskPlan(val text: String, val fields: List<MaskedField>) {
  */
 class ImageMasker(private val classifier: Classifier = Classifier(IMAGE_DETECTORS)) {
 
-    fun plan(lines: List<OcrLine>, policy: Policy): ImageMaskPlan {
+    /**
+     * [regions] are what the picture detectors found that is not text: faces and QR codes. On an
+     * ID card, [CardLayout] also covers what OCR could not read by where it is printed.
+     */
+    fun plan(lines: List<OcrLine>, policy: Policy, regions: List<ImageRegion> = emptyList()): ImageMaskPlan {
         // Rebuild the page as text (words joined by spaces, lines by newlines), remembering
         // where each word sits, so a detection's character range maps back to pixels.
         val text = StringBuilder()
         // Each word with its character range and the right edge of the word before it on the line.
         val spans = mutableListOf<Triple<IntRange, OcrWord, Int?>>()
+        val lineRanges = mutableListOf<IntRange>()
         lines.forEachIndexed { li, line ->
             if (li > 0) text.append('\n')
+            val lineStart = text.length
             line.words.forEachIndexed { wi, word ->
                 if (wi > 0) text.append(' ')
                 val start = text.length
                 text.append(word.text)
                 spans += Triple(start until text.length, word, line.words.getOrNull(wi - 1)?.box?.right)
             }
+            lineRanges += lineStart until text.length
         }
 
-        val fields = classifier.classify(text.toString()).mapNotNull { d ->
+        val layout = CardLayout(lines, lineRanges, text.toString(), regions)
+        // Where the layout claims a line for a category, it covers the whole line; a narrower
+        // detection of the same category there would only be counted twice.
+        val detected = classifier.classify(text.toString())
+            .filterNot { d -> layout.zones.any { z -> z.category == d.category && z.start < d.end && d.start < z.end } }
+            .filterNot { d -> UIDAI.containsMatchIn(d.value) }
+        val fields = (detected + layout.zones).sortedBy { it.start }.mapNotNull { d ->
             val action = policy.actionFor(d.category)
             if (action == DisclosureAction.ALLOW) return@mapNotNull null
             val keepLast4 = action == DisclosureAction.KEEP_LAST_4
@@ -64,7 +82,9 @@ class ImageMasker(private val classifier: Classifier = Classifier(IMAGE_DETECTOR
             val boxes = spans.mapNotNull { (range, word, prevRight) -> cover(range, word, prevRight, d.start, coverEnd) }
             if (boxes.isEmpty()) null else MaskedField(d.category, d.value, boxes, keepLast4)
         }
-        return ImageMaskPlan(text.toString(), fields)
+        val drawn = layout.boxes.filter { policy.actionFor(it.category) != DisclosureAction.ALLOW }
+            .map { MaskedField(it.category, it.value, listOf(it.box), keepsLast4 = false) }
+        return ImageMaskPlan(text.toString(), fields + drawn)
     }
 
     /** Where the last four digits (or characters) of a detection begin in the page text. */
@@ -116,8 +136,24 @@ class ImageMasker(private val classifier: Classifier = Classifier(IMAGE_DETECTOR
             Regex("""(?<![\d-])\d{4}[ -]\d{4}[ -]\d{4}(?![\d-])"""),
         )
 
+        /**
+         * OCR misreads dates ("01/05/2003" as "01UO5/2003"). After a date-of-birth label, whatever
+         * follows that starts with a digit is covered.
+         */
+        val DOB_LOOSE = RegexDetector(
+            DataCategory.DATE_OF_BIRTH, "Date of birth (OCR)",
+            Regex("""(?i)\b(?:dob|d\.o\.b\.?|date of birth|yob|year of birth)\s*[:\-]?\s*(?<v>\d\S{3,11})"""),
+        )
+
+        /** UIDAI's own helpline and addresses, printed on every card: public, not the holder's. */
+        private val UIDAI = Regex("""(?i)uidai\.gov""")
+
         val IMAGE_DETECTORS: List<Detector> = Detectors.DEFAULT.flatMap {
-            if (it === Detectors.AADHAAR) listOf(it, AADHAAR_LOOSE) else listOf(it)
+            when {
+                it === Detectors.AADHAAR -> listOf(it, AADHAAR_LOOSE)
+                it === Detectors.DOB -> listOf(it, DOB_LOOSE)
+                else -> listOf(it)
+            }
         }
     }
 }

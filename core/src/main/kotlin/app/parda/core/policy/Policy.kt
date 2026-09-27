@@ -21,6 +21,10 @@ enum class DataCategory(val label: String, val tokenPrefix: String) {
      * masking them is the stricter mode, for a report going to an employer or an insurer.
      */
     HEALTH_CONDITION("Health conditions", "CONDITION"),
+    /** Images only: a face, usually the photo on an ID card. */
+    FACE_PHOTO("Face photos", "FACE"),
+    /** Images only: QR codes and barcodes. The QR on an Aadhaar carries the name, address, date of birth and photo. */
+    QR_CODE("QR codes and barcodes", "QR"),
 }
 
 /** What the outbound gate does with one detected item. */
@@ -30,6 +34,23 @@ enum class DisclosureAction(val label: String) {
     SURROGATE("Replace with a surrogate"),
     KEEP_LAST_4("Mask all but the last 4"),
     ALLOW("Let it pass"),
+    /**
+     * A made-up value of the same shape ("Arjun Mehta", "arjun.mehta@example.com"), so the copy
+     * reads naturally. Chosen by code from fixed lists; swapped back like a surrogate.
+     */
+    STAND_IN("Swap for a realistic stand-in"),
+    ;
+
+    /** Stand-ins exist only where a fake value cannot mislead or belong to someone real. */
+    fun appliesTo(category: DataCategory): Boolean = this != STAND_IN || category in STAND_IN_CATEGORIES
+
+    companion object {
+        /**
+         * Amounts are left out because a fake salary gives a confidently wrong answer, and
+         * phone numbers because India has no reserved range, so a fake one may be a real person's.
+         */
+        val STAND_IN_CATEGORIES = setOf(DataCategory.PERSON_NAME, DataCategory.EMAIL, DataCategory.ADDRESS)
+    }
 }
 
 /**
@@ -76,7 +97,8 @@ data class Policy(
     val perApp: Map<String, Set<DarkPatternKind>> = emptyMap(),
 ) {
     fun actionFor(category: DataCategory): DisclosureAction =
-        disclosure[category] ?: DEFAULT_DISCLOSURE.getValue(category)
+        (disclosure[category] ?: DEFAULT_DISCLOSURE.getValue(category))
+            .let { if (it.appliesTo(category)) it else DisclosureAction.SURROGATE }
 
     /** The action in [app]: the user's rule for that app first, then the global one. */
     fun actionFor(kind: DarkPatternKind, app: String? = null): CheckoutAction {
@@ -112,6 +134,8 @@ data class Policy(
             DataCategory.DATE_OF_BIRTH to DisclosureAction.SURROGATE,
             DataCategory.HEALTH_ID to DisclosureAction.SURROGATE,
             DataCategory.HEALTH_CONDITION to DisclosureAction.ALLOW,
+            DataCategory.FACE_PHOTO to DisclosureAction.BLOCK,
+            DataCategory.QR_CODE to DisclosureAction.BLOCK,
         )
 
         val DEFAULT_CHECKOUT: Map<DarkPatternKind, CheckoutAction> = mapOf(

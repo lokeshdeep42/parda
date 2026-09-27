@@ -64,6 +64,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import app.parda.core.policy.DisclosureAction
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -298,7 +301,7 @@ fun AirlockScreen(initialText: String?, initialImage: Uri? = null) {
                     if (preview != null && document == preview && (fullText?.length ?: 0) > document.length) {
                         Text(stringResource(R.string.air_copy_is_box), style = MaterialTheme.typography.bodyMedium, color = Frost.Ink2)
                     }
-                    Mono(d.outbound)
+                    Mono(d.outbound, d.result.vault.entries.filter { it.action == DisclosureAction.STAND_IN }.map { it.token })
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
                         Pill(stringResource(R.string.copy), strong = true, onClick = { clipboard.setText(AnnotatedString(d.outbound)) })
                         Pill(stringResource(R.string.share_dots), onClick = {
@@ -514,10 +517,16 @@ private fun displayName(context: Context, uri: Uri): String? =
     }
 
 @Composable
-private fun Mono(text: String) {
+private fun Mono(text: String, highlight: List<String> = emptyList()) {
+    // Stand-ins read like real values, so the user is shown which ones are made up.
+    val shown = if (highlight.isEmpty()) AnnotatedString(text) else buildAnnotatedString {
+        append(text)
+        val pattern = Regex(highlight.sortedByDescending { it.length }.joinToString("|") { Regex.escape(it) })
+        pattern.findAll(text).forEach { addStyle(SpanStyle(background = Frost.WarnBg, color = Frost.WarnInk), it.range.first, it.range.last + 1) }
+    }
     SelectionContainer {
         Text(
-            text,
+            shown,
             modifier = Modifier.fillMaxWidth().heightIn(max = 320.dp).clip(RoundedCornerShape(14.dp))
                 .background(Color.White).verticalScroll(rememberScrollState()).padding(12.dp),
             fontFamily = FontFamily.Monospace,

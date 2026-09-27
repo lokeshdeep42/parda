@@ -113,12 +113,12 @@ fun FirewallScreen(policy: Policy, onPolicy: (Policy) -> Unit) {
                         hint = if (cat == DataCategory.HEALTH_CONDITION) {
                             stringResource(R.string.fw_condition_hint)
                         } else {
-                            stringResource(R.string.fw_shown_as, "<${cat.tokenPrefix}_1>")
+                            stringResource(R.string.fw_shown_as, if (action == DisclosureAction.STAND_IN) standInExample(cat) else "<${cat.tokenPrefix}_1>")
                         },
                         action = action.title,
                         strong = action == DisclosureAction.BLOCK,
                         last = i == DataCategory.entries.lastIndex,
-                    ) { onPolicy(policy.with(cat, nextDisclosure(action))) }
+                    ) { onPolicy(policy.with(cat, nextDisclosure(cat, action))) }
                 }
             }
             Text(
@@ -156,8 +156,18 @@ private fun nextCheckout(kind: DarkPatternKind, current: CheckoutAction): Checko
     return options[(options.indexOf(current) + 1) % options.size]
 }
 
-private fun nextDisclosure(current: DisclosureAction): DisclosureAction =
-    DisclosureAction.entries[(current.ordinal + 1) % DisclosureAction.entries.size]
+/** Next action for [category], skipping stand-ins where the category does not take them. */
+private fun nextDisclosure(category: DataCategory, current: DisclosureAction): DisclosureAction {
+    val options = DisclosureAction.entries.filter { it.appliesTo(category) }
+    return options[(options.indexOf(current) + 1) % options.size]
+}
+
+/** What a stand-in looks like, for the rule's hint. */
+private fun standInExample(category: DataCategory): String = when (category) {
+    DataCategory.PERSON_NAME -> "Arjun Mehta"
+    DataCategory.EMAIL -> "arjun.mehta@example.com"
+    else -> "Plot 17, Lakeview Colony, Hyderabad"
+}
 
 private fun appName(context: Context, pkg: String): String = if (pkg == context.packageName) context.getString(R.string.demo_stores) else runCatching {
     context.packageManager.getApplicationLabel(context.packageManager.getApplicationInfo(pkg, 0)).toString()
