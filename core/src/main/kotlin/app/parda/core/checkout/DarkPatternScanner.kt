@@ -1,5 +1,6 @@
 package app.parda.core.checkout
 
+import app.parda.core.agent.Planner
 import app.parda.core.policy.CheckoutAction
 import app.parda.core.policy.DarkPatternKind
 import app.parda.core.policy.Policy
@@ -35,6 +36,8 @@ data class Finding(
     val cost: Long = 0,
     /** Monthly charge this pattern commits the user to, in paise. */
     val recurring: Long = 0,
+    /** The rules found it, or the on-device model did (and the rules then verified it). */
+    val by: Planner = Planner.RULES,
 ) {
     val fixable: Boolean get() = nodeId != null && kind.fixable
 
@@ -45,6 +48,12 @@ data class Finding(
         val DIGITS = Regex("""\d""")
     }
 }
+
+/**
+ * One row of a checkout as the on-device model reads it. [box] is the checkbox on the row, if
+ * any, [ticked] whether it is ticked, and [boxLabel] the box's own words (the item, without its price).
+ */
+data class ScreenLine(val number: Int, val text: String, val box: String?, val ticked: Boolean, val boxLabel: String?)
 
 data class CheckoutScan(val isCheckout: Boolean, val findings: List<Finding>) {
     val recoverable: Long get() = findings.filter { it.fixable }.sumOf { it.cost }
@@ -77,14 +86,7 @@ class DarkPatternScanner {
         if (!asked || Money.oneOffAmounts(screenText).size < MIN_PRICES) {
             return CheckoutScan.NONE
         }
-        fun textOf(n: ScreenNode): String {
-            val row = rowOf(n, parents)
-            if (row !== n) return rowText(row, n)
-            // Flat layout (web pages in Chrome): the price is the next sibling, not a child.
-            val next = nextSibling[n.id]?.takeIf { !it.checkable && PRICE_ONLY.matches(it.label.trim()) }
-            // A checkable row can carry its label and price in its own children.
-            return listOfNotNull(rowText(n, n).ifBlank { null }, next?.label).joinToString("  ")
-        }
+        fun textOf(n: ScreenNode): String = textOf(n, parents, nextSibling)
 
         val findings = mutableListOf<Finding>()
         val rowsSeen = HashSet<String>()
@@ -168,6 +170,57 @@ class DarkPatternScanner {
     }
 
     /**
+     * The screen as numbered lines, one per row, in reading order: what the on-device model is
+     * shown. A row with a checkbox carries that box's node and whether it is ticked, so anything
+     * the model says about a line can be checked against the screen itself.
+     */
+    fun lines(root: ScreenNode): List<ScreenLine> {
+        val parents = HashMap<String, ScreenNode>()
+        val nextSibling = HashMap<String, ScreenNode>()
+        val all = mutableListOf<ScreenNode>()
+        fun walk(n: ScreenNode) {
+            all += n
+            n.children.zipWithNext { a, b -> nextSibling[a.id] = b }
+            n.children.forEach { parents[it.id] = n; walk(it) }
+        }
+        walk(root)
+
+        val lines = mutableListOf<ScreenLine>()
+        val rows = HashSet<String>()
+        // A price on its own line is folded into the row before it (web layouts put it beside).
+        val folded = HashSet<String>()
+        for (n in all) {
+            if (lines.size >= MAX_LINES) break
+            if (n.id in folded || (n.label.isBlank() && !n.checkable)) continue
+            // Web checkboxes nest a ticked box in a ticked label: the outer one speaks for the row.
+            if (n.checkable && generateSequence(parents[n.id]) { parents[it.id] }.any { it.checkable }) continue
+            val row = rowOf(n, parents)
+            if (!rows.add(row.id)) continue
+            val box = if (n.checkable) n else firstCheckable(row)
+            val text = textOf(box ?: n, parents, nextSibling)
+            nextSibling[n.id]?.takeIf { !it.checkable && PRICE_ONLY.matches(it.label.trim()) }?.let { folded += it.id }
+            fun mark(x: ScreenNode) { rows += x.id; x.children.forEach(::mark) }
+            mark(row)
+            val clean = cleanLabel(text).take(MAX_LINE_CHARS)
+            if (clean.isBlank()) continue
+            lines += ScreenLine(lines.size + 1, clean, box?.id, box?.checked ?: false, box?.let { cleanLabel(it.label) })
+        }
+        return lines
+    }
+
+    private fun firstCheckable(n: ScreenNode): ScreenNode? =
+        if (n.checkable) n else n.children.firstNotNullOfOrNull { firstCheckable(it) }
+
+    private fun textOf(n: ScreenNode, parents: Map<String, ScreenNode>, nextSibling: Map<String, ScreenNode>): String {
+        val row = rowOf(n, parents)
+        if (row !== n) return rowText(row, n)
+        // Flat layout (web pages in Chrome): the price is the next sibling, not a child.
+        val next = nextSibling[n.id]?.takeIf { !it.checkable && PRICE_ONLY.matches(it.label.trim()) }
+        // A checkable row can carry its label and price in its own children.
+        return listOfNotNull(rowText(n, n).ifBlank { null }, next?.label).joinToString("  ")
+    }
+
+    /**
      * The row a node belongs to: the nearest ancestor that is still small enough to be a single
      * line item (a checkbox, a label and a price). It climbs past wrappers until it reaches a
      * price, because apps nest them: Swiggy puts "Handling Fee" three levels below the row that
@@ -204,6 +257,9 @@ class DarkPatternScanner {
     companion object {
         private const val MAX_ROW_TEXTS = 4
         private const val MIN_PRICES = 2
+        /** Enough for any real cart, few enough for the model to read in a couple of seconds. */
+        private const val MAX_LINES = 40
+        private const val MAX_LINE_CHARS = 140
 
         private val PRICE_ONLY = Regex("""(?i)(\bfree\b|(₹|\brs\.?|\binr)\s?\d[\d,]*(\.\d{1,2})?|\d[\d,]*(\.\d{1,2})?\s?rupees?\b)""")
 
@@ -304,7 +360,8 @@ object CheckoutGate {
         val flag = mutableListOf<Finding>()
         for (f in scan.findings) {
             when (policy.actionFor(f.kind, app)) {
-                CheckoutAction.AUTO_REMOVE -> if (f.fixable) auto += f else ask += f
+                // What the model found is always offered, never removed unasked.
+                CheckoutAction.AUTO_REMOVE -> if (f.fixable && f.by == Planner.RULES) auto += f else ask += f
                 CheckoutAction.ASK_ME -> ask += f
                 CheckoutAction.FLAG_ONLY -> flag += f
                 CheckoutAction.IGNORE -> Unit
