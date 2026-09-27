@@ -76,6 +76,7 @@ val DisclosureAction.title: String
             DisclosureAction.SURROGATE -> R.string.disc_surrogate
             DisclosureAction.KEEP_LAST_4 -> R.string.disc_last4
             DisclosureAction.ALLOW -> R.string.disc_allow
+            DisclosureAction.STAND_IN -> R.string.disc_stand_in
         },
     )
 

@@ -34,6 +34,7 @@
     <string name="disc_surrogate">Replace with a surrogate</string>
     <string name="disc_last4">Mask all but the last 4</string>
     <string name="disc_allow">Let it pass</string>
+    <string name="disc_stand_in">Swap for a realistic stand-in</string>
     <string name="co_auto">Auto-remove</string>
     <string name="co_ask">Ask me</string>
     <string name="co_flag">Flag only</string>
