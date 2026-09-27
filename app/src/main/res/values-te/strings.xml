@@ -5,7 +5,7 @@
     <string name="share_label">Pardaతో తనిఖీ చేయండి</string>
     <string name="process_text_label">Pardaతో దాచండి</string>
     <string name="a11y_label">Parda చెక్అవుట్ కవచం</string>
-    <string name="a11y_description">Parda ఈ ఫోన్‌లోనే చెక్అవుట్ స్క్రీన్‌లను చదివి, ముందే టిక్ చేసిన యాడ్-ఆన్‌లు, చివరి దశలో జోడించే రుసుములు, నకిలీ టైమర్లు, సిగ్గుపడేలా చేసే బటన్లను గుర్తిస్తుంది. ఇది ఎప్పుడూ చెల్లింపు నొక్కదు, దీనికి ఇంటర్నెట్ అనుమతి లేదు, కాబట్టి ఇది చదివింది ఏదీ ఫోన్ దాటి వెళ్ళదు.</string>
+    <string name="a11y_description">Parda ఈ ఫోన్‌లోనే చెక్అవుట్ స్క్రీన్‌లను చదివి, ముందే టిక్ చేసిన యాడ్-ఆన్‌లు, చివరి దశలో జోడించే రుసుములు, నకిలీ టైమర్లు, సిగ్గుపడేలా చేసే బటన్లను గుర్తిస్తుంది. ఇది ఎప్పుడూ చెల్లింపు నొక్కదు, దీనికి ఇంటర్నెట్ అనుమతి లేదు, కాబట్టి ఇది చదివింది ఏదీ ఫోన్ దాటి వెళ్ళదు. వెబ్ పేజీలో Pardaతో దాచండి ఎంచుకున్నప్పుడు, దాచిన కాపీని అదే బాక్స్‌లో పేస్ట్ చేస్తుంది.</string>
     <string name="channel_intercepts">ఆపిన చెక్అవుట్‌లు</string>
     <string name="quick_mask_label">దాచి పంపండి</string>
     <string name="tile_label">క్లిప్‌బోర్డ్ దాచండి</string>
@@ -30,13 +30,10 @@
     <string name="cat_dob">పుట్టిన తేదీలు</string>
     <string name="cat_health_id">ఆరోగ్య రికార్డ్ ఐడీలు</string>
     <string name="cat_condition">వ్యాధులు, నిర్ధారణలు</string>
-    <string name="cat_face">ముఖ చిత్రాలు</string>
-    <string name="cat_qr">QR కోడ్‌లు, బార్‌కోడ్‌లు</string>
     <string name="disc_block">పూర్తిగా ఆపండి</string>
     <string name="disc_surrogate">ప్లేస్‌హోల్డర్‌తో మార్చండి</string>
     <string name="disc_last4">చివరి 4 తప్ప దాచండి</string>
     <string name="disc_allow">వెళ్ళనివ్వండి</string>
-    <string name="disc_stand_in">నిజంలా కనిపించే నకిలీతో మార్చు</string>
     <string name="co_auto">ఆటోమేటిక్‌గా తీసేయండి</string>
     <string name="co_ask">నన్ను అడగండి</string>
     <string name="co_flag">చెప్పండి చాలు</string>
@@ -228,6 +225,9 @@
     <string name="ds_movie">సినిమా టికెట్లు</string>
     <string name="ds_grocery">కిరాణా</string>
     <string name="ds_honest">పుస్తకాలు, మోసాలు లేవు</string>
+    <string name="cat_face">ముఖ చిత్రాలు</string>
+    <string name="cat_qr">QR కోడ్‌లు, బార్‌కోడ్‌లు</string>
+    <string name="disc_stand_in">నిజంలా కనిపించే నకిలీతో మార్చు</string>
     <string name="kind_forced">ముందే ఎంచుకున్న సైన్-అప్‌లు</string>
     <string name="kind_forced_hint">లాయల్టీ క్లబ్‌లు, ప్రచార సందేశాలు</string>
     <string name="kind_priority">త్వరగా కావాలంటే అదనపు చెల్లింపు</string>
@@ -236,6 +236,8 @@
     <string name="kind_trick_hint">“వద్దనుకుంటే టిక్ తీసేయండి…”</string>
     <string name="sheet_on_record">రికార్డులో</string>
     <string name="air_model_recommended">సిఫార్సు చేసినది</string>
+    <string name="pt_clip_label">Parda దాచింది</string>
+    <string name="pt_paste_to_replace">దాచిన కాపీ క్లిప్‌బోర్డ్‌లో ఉంది. మీ టెక్స్ట్ స్థానంలో దాన్ని పేస్ట్ చేయండి.</string>
     <string name="sheet_by_model">ఫోన్ మోడల్</string>
     <string name="ds_sneaky">అర్ధరాత్రి ఆహారం, కొత్త మోసాలు</string>
     <string name="ds_model_only">ఈ మోసాలను ఫోన్ మోడల్ మాత్రమే పట్టుకుంటుంది</string>

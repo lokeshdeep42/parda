@@ -5,7 +5,7 @@
     <string name="share_label">Check with Parda</string>
     <string name="process_text_label">Mask with Parda</string>
     <string name="a11y_label">Parda checkout shield</string>
-    <string name="a11y_description">Parda reads checkout screens on this phone to spot pre-ticked add-ons, last-step fees, fake timers and guilt-worded buttons. It never taps Pay, and it has no internet permission, so nothing it reads can leave the device.</string>
+    <string name="a11y_description">Parda reads checkout screens on this phone to spot pre-ticked add-ons, last-step fees, fake timers and guilt-worded buttons. It never taps Pay, and it has no internet permission, so nothing it reads can leave the device. When you choose Mask with Parda on a web page, it pastes the masked copy into that same box.</string>
     <string name="channel_intercepts">Checkout intercepts</string>
     <string name="quick_mask_label">Mask &amp; share</string>
     <string name="tile_label">Mask clipboard</string>
@@ -30,13 +30,10 @@
     <string name="cat_dob">Dates of birth</string>
     <string name="cat_health_id">Health record IDs</string>
     <string name="cat_condition">Health conditions</string>
-    <string name="cat_face">Face photos</string>
-    <string name="cat_qr">QR codes and barcodes</string>
     <string name="disc_block">Block outright</string>
     <string name="disc_surrogate">Replace with a surrogate</string>
     <string name="disc_last4">Mask all but the last 4</string>
     <string name="disc_allow">Let it pass</string>
-    <string name="disc_stand_in">Swap for a realistic stand-in</string>
     <string name="co_auto">Auto-remove</string>
     <string name="co_ask">Ask me</string>
     <string name="co_flag">Flag only</string>
@@ -228,6 +225,9 @@
     <string name="ds_movie">movie tickets</string>
     <string name="ds_grocery">groceries</string>
     <string name="ds_honest">books, no tricks</string>
+    <string name="cat_face">Face photos</string>
+    <string name="cat_qr">QR codes and barcodes</string>
+    <string name="disc_stand_in">Swap for a realistic stand-in</string>
     <string name="kind_forced">Pre-ticked sign-ups</string>
     <string name="kind_forced_hint">Loyalty clubs, promotional messages</string>
     <string name="kind_priority">Pay for priority</string>
@@ -236,6 +236,8 @@
     <string name="kind_trick_hint">“Untick if you don’t want…”</string>
     <string name="sheet_on_record">On record</string>
     <string name="air_model_recommended">Recommended</string>
+    <string name="pt_clip_label">Masked by Parda</string>
+    <string name="pt_paste_to_replace">The masked copy is on your clipboard. Paste it over your text.</string>
     <string name="sheet_by_model">on-device model</string>
     <string name="ds_sneaky">late-night food, new tricks</string>
     <string name="ds_model_only">Tricks only the on-device model catches</string>
