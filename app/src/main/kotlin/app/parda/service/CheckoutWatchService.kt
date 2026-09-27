@@ -13,6 +13,7 @@ import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.util.Log
 import android.os.Build
+import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
@@ -269,6 +270,62 @@ class CheckoutWatchService : AccessibilityService() {
         }, AFTER_SHEET_MS)
     }
 
+    /**
+     * Puts the masked copy (already on the clipboard) in place of [original] in the focused text
+     * box of [pkg], just after "Mask with Parda" closes. Leaving the browser for that moment
+     * collapses its selection to a cursor after the words, which is why a page then adds the text
+     * as a new paragraph. So the words are selected again first, then pasted over: every web editor
+     * replaces a selection on paste. Only an editable box of the app that asked is touched, and only
+     * if it still holds [original]; [onDone] says whether the text was replaced.
+     */
+    fun pasteMasked(pkg: String, original: String, onDone: (Boolean) -> Unit) {
+        fun done(ok: Boolean, why: String) {
+            if (debuggable) Log.i(TAG, "mask in $pkg: ${if (ok) "replaced" else "not replaced ($why)"}")
+            onDone(ok)
+        }
+        fun attempt(retries: Int) {
+            val root = rootInActiveWindow
+            // The browser's window takes a moment to be active again after Parda's closes.
+            if (root?.packageName?.toString() != pkg) {
+                if (retries > 0) handler.postDelayed({ attempt(retries - 1) }, PASTE_RETRY_MS) else done(false, "window ${root?.packageName}")
+                return
+            }
+            // Chrome does not always report its web text box as the focused input: then look for the
+            // editable box that holds the words (the focused one first, if several do).
+            val box = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)?.takeIf { it.isEditable && original in (it.text ?: "") }
+                ?: editableHolding(root, original)
+                ?: return if (retries > 0) handler.postDelayed({ attempt(retries - 1) }, PASTE_RETRY_MS).let {} else done(false, "no box holds the words")
+            val text = box.text?.toString().orEmpty()
+            val end = box.textSelectionEnd
+            // The words just before the cursor, else their first appearance in the box.
+            val start = (end - original.length).takeIf { it >= 0 && text.regionMatches(it, original, 0, original.length) }
+                ?: text.indexOf(original).takeIf { it >= 0 }
+                ?: return done(false, "words not found in ${text.length} chars, cursor $end")
+            val range = Bundle().apply {
+                putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_START_INT, start)
+                putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_END_INT, start + original.length)
+            }
+            if (!box.performAction(AccessibilityNodeInfo.ACTION_SET_SELECTION, range)) return done(false, "selection refused")
+            handler.postDelayed({
+                done(box.performAction(AccessibilityNodeInfo.ACTION_PASTE), "paste refused")
+            }, SELECT_TO_PASTE_MS)
+        }
+        handler.postDelayed({ attempt(PASTE_RETRIES) }, PASTE_AFTER_MS)
+    }
+
+    /** An editable box under [root] whose text contains [words]; a focused one wins. */
+    private fun editableHolding(root: AccessibilityNodeInfo, words: String): AccessibilityNodeInfo? {
+        val found = mutableListOf<AccessibilityNodeInfo>()
+        val queue = ArrayDeque(listOf(root))
+        var seen = 0
+        while (queue.isNotEmpty() && seen++ < MAX_NODES) {
+            val n = queue.removeFirst()
+            if (n.isEditable && words in (n.text ?: "")) found += n
+            for (i in 0 until n.childCount) n.getChild(i)?.let(queue::addLast)
+        }
+        return found.firstOrNull { it.isFocused } ?: found.firstOrNull()
+    }
+
     private fun isTicked(n: ScreenNode, id: String): Boolean =
         if (n.id == id) n.checkable && n.checked else n.children.any { isTicked(it, id) }
 
@@ -337,6 +394,11 @@ class CheckoutWatchService : AccessibilityService() {
         /** A review that takes longer than this is dropped: by then the user has moved on. */
         private const val REVIEW_BUDGET_MS = 15_000L
         private const val AFTER_SHEET_MS = 450L
+        private const val PASTE_AFTER_MS = 350L
+        private const val PASTE_RETRY_MS = 250L
+        private const val PASTE_RETRIES = 4
+        private const val SELECT_TO_PASTE_MS = 120L
+        private const val MAX_NODES = 3000
         private const val NOTIFICATION_ID = 1
 
         /** System surfaces that are never checkouts. */

@@ -5,7 +5,7 @@
     <string name="share_label">Parda से जाँचें</string>
     <string name="process_text_label">Parda से छिपाएँ</string>
     <string name="a11y_label">Parda चेकआउट कवच</string>
-    <string name="a11y_description">Parda इसी फ़ोन पर चेकआउट स्क्रीन पढ़ता है ताकि पहले से चुने ऐड-ऑन, आख़िरी क़दम पर जुड़े शुल्क, झूठे टाइमर और शर्मिंदा करने वाले बटन पकड़ सके। यह कभी भुगतान नहीं दबाता, और इसके पास इंटरनेट की अनुमति नहीं है, इसलिए जो भी यह पढ़ता है वह फ़ोन से बाहर नहीं जा सकता।</string>
+    <string name="a11y_description">Parda इसी फ़ोन पर चेकआउट स्क्रीन पढ़ता है ताकि पहले से चुने ऐड-ऑन, आख़िरी क़दम पर जुड़े शुल्क, झूठे टाइमर और शर्मिंदा करने वाले बटन पकड़ सके। यह कभी भुगतान नहीं दबाता, और इसके पास इंटरनेट की अनुमति नहीं है, इसलिए जो भी यह पढ़ता है वह फ़ोन से बाहर नहीं जा सकता। जब आप किसी वेब पेज पर Parda से छिपाएँ चुनते हैं, तो यह छिपाई गई कॉपी उसी बॉक्स में चिपका देता है।</string>
     <string name="channel_intercepts">रोके गए चेकआउट</string>
     <string name="quick_mask_label">छिपाकर भेजें</string>
     <string name="tile_label">क्लिपबोर्ड छिपाएँ</string>
@@ -30,13 +30,10 @@
     <string name="cat_dob">जन्म तिथियाँ</string>
     <string name="cat_health_id">स्वास्थ्य रिकॉर्ड आईडी</string>
     <string name="cat_condition">बीमारियाँ और निदान</string>
-    <string name="cat_face">चेहरे की फ़ोटो</string>
-    <string name="cat_qr">QR कोड और बारकोड</string>
     <string name="disc_block">पूरी तरह रोकें</string>
     <string name="disc_surrogate">प्लेसहोल्डर से बदलें</string>
     <string name="disc_last4">आख़िरी 4 छोड़कर छिपाएँ</string>
     <string name="disc_allow">जाने दें</string>
-    <string name="disc_stand_in">असली जैसे नकली से बदलें</string>
     <string name="co_auto">अपने-आप हटाएँ</string>
     <string name="co_ask">मुझसे पूछें</string>
     <string name="co_flag">सिर्फ़ बताएँ</string>
@@ -228,6 +225,9 @@
     <string name="ds_movie">फ़िल्म टिकट</string>
     <string name="ds_grocery">किराना</string>
     <string name="ds_honest">किताबें, कोई चाल नहीं</string>
+    <string name="cat_face">चेहरे की फ़ोटो</string>
+    <string name="cat_qr">QR कोड और बारकोड</string>
+    <string name="disc_stand_in">असली जैसे नकली से बदलें</string>
     <string name="kind_forced">पहले से चुने साइन-अप</string>
     <string name="kind_forced_hint">लॉयल्टी क्लब, प्रचार संदेश</string>
     <string name="kind_priority">जल्दी के लिए ज़्यादा भुगतान</string>
@@ -236,6 +236,8 @@
     <string name="kind_trick_hint">“न चाहें तो टिक हटाएँ…”</string>
     <string name="sheet_on_record">रिकॉर्ड पर</string>
     <string name="air_model_recommended">सुझाया गया</string>
+    <string name="pt_clip_label">Parda ने छिपाया</string>
+    <string name="pt_paste_to_replace">छिपाई गई कॉपी क्लिपबोर्ड पर है। इसे अपने टेक्स्ट की जगह चिपकाएँ।</string>
     <string name="sheet_by_model">फ़ोन का मॉडल</string>
     <string name="ds_sneaky">देर रात का खाना, नई चालें</string>
     <string name="ds_model_only">ये चालें सिर्फ़ फ़ोन का मॉडल पकड़ता है</string>
