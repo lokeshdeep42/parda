@@ -15,6 +15,8 @@ import android.util.Log
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
+import java.util.concurrent.Executors
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import androidx.core.app.NotificationCompat
@@ -85,10 +87,11 @@ class CheckoutWatchService : AccessibilityService() {
         if (!scan.isCheckout) {
             // A half-drawn screen during a transition can look like "not a checkout". Only
             // forget what was handled once the user has really been away for a while.
-            if (now - (lastCheckoutAt[pkg] ?: 0L) > FORGET_AFTER_MS) { seen.clear(); unticked.clear() }
+            if (now - (lastCheckoutAt[pkg] ?: 0L) > FORGET_AFTER_MS) { seen.clear(); unticked.clear(); modelFound.remove(pkg) }
             return
         }
         lastCheckoutAt[pkg] = now
+        review(pkg, snapshot, scan)
         // A box seen empty on this checkout and ticked later was ticked by the user: their choice.
         val chosen = unticked.toSet()
         fun collect(n: ScreenNode) { if (n.checkable && !n.checked) unticked += n.label.trim(); n.children.forEach(::collect) }
@@ -128,6 +131,71 @@ class CheckoutWatchService : AccessibilityService() {
             plan.shouldNotify -> notify(app, plan.flag, saved)
         }
     }
+
+    /**
+     * The on-device model's second look, for tricks worded in ways the rules do not know. Runs off
+     * the main thread, once per distinct screen (digits ignored, so a ticking countdown is one
+     * screen). What it finds has already been checked against the screen in core, and is only ever
+     * offered: added to the sheet if it is up, or shown on its own if the rules found nothing.
+     */
+    private fun review(pkg: String, snapshot: ScreenNode, scan: CheckoutScan) {
+        val reviewer = store.reviewer ?: return
+        val signature = pkg + "\n" + store.scanner.lines(snapshot).joinToString("\n") { it.text.replace(DIGITS, "#") }
+        synchronized(reviewed) {
+            if (!reviewed.add(signature)) return
+            if (reviewed.size > MAX_REVIEWED) reviewed.remove(reviewed.first())
+        }
+        val started = SystemClock.elapsedRealtime()
+        reviews.execute {
+            val found = reviewer.review(snapshot, scan)
+            val took = SystemClock.elapsedRealtime() - started
+            if (debuggable) {
+                Log.i(TAG, "model review of $pkg: ${found.size} finding(s) in $took ms")
+                found.forEach { Log.i(TAG, "model finding ${it.kind} fixable=${it.fixable} cost=${it.cost}: ${it.evidence}") }
+            }
+            // Too late to matter: the user has moved on or already paid.
+            if (found.isEmpty() || took > REVIEW_BUDGET_MS) return@execute
+            handler.post { offer(pkg, found) }
+        }
+    }
+
+    private fun offer(pkg: String, found: List<Finding>) {
+        val showing = InterceptState.current.value?.takeIf { it.packageName == pkg }
+        if (showing == null) {
+            // Only while that checkout is still on screen.
+            val root = rootInActiveWindow ?: return
+            if (root.packageName?.toString() != pkg) return
+            if (!store.scanner.scan(ScreenSnapshot.capture(root)).isCheckout) return
+        }
+        val seen = handled.getOrPut(pkg) { HashSet() }
+        val new = found.filter { it.key !in seen }
+        if (new.isEmpty()) return
+        seen += new.map { it.key }
+        modelFound.getOrPut(pkg) { mutableListOf() }.addAll(new)
+
+        val app = appLabel(pkg)
+        store.record(
+            Channel.A, Verdict.FLAGGED,
+            "The on-device model found ${new.size} more thing(s) on a checkout in $app",
+            patterns = new.size,
+        )
+        val plan = CheckoutGate.plan(CheckoutScan(true, new), store.policy.value, app = pkg)
+        when {
+            showing != null && plan.ask.isNotEmpty() -> {
+                InterceptState.show(showing.copy(plan = showing.plan.copy(ask = showing.plan.ask + plan.ask)))
+                openSheet()
+            }
+            showing == null && plan.shouldIntercept -> {
+                InterceptState.show(Intercept(pkg, app, plan))
+                openSheet()
+            }
+            plan.flag.isNotEmpty() -> notify(app, plan.flag)
+        }
+    }
+
+    private fun openSheet() = startActivity(
+        Intent(this, InterceptActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_ANIMATION),
+    )
 
     /**
      * Keeps the last few screens that showed prices, in memory only, so the user can report one
@@ -178,7 +246,13 @@ class CheckoutWatchService : AccessibilityService() {
         handler.postDelayed({
             val root = rootInActiveWindow ?: return@postDelayed
             if (root.packageName?.toString() != pkg) return@postDelayed
-            val scan = store.scanner.scan(ScreenSnapshot.capture(root))
+            val snapshot = ScreenSnapshot.capture(root)
+            val rules = store.scanner.scan(snapshot)
+            // What the model found and the user approved, if it is still a ticked box on screen.
+            val model = modelFound[pkg].orEmpty().filter { f ->
+                f.fixable && f.key in approvedKeys && f.key !in rules.findings.map { it.key } && isTicked(snapshot, f.nodeId!!)
+            }
+            val scan = rules.copy(findings = rules.findings + model)
             val targets = scan.findings.filter { it.fixable && it.key in approvedKeys }
             val removed = untick(root, scan, targets)
             if (removed.isNotEmpty()) {
@@ -194,6 +268,9 @@ class CheckoutWatchService : AccessibilityService() {
             }
         }, AFTER_SHEET_MS)
     }
+
+    private fun isTicked(n: ScreenNode, id: String): Boolean =
+        if (n.id == id) n.checkable && n.checked else n.children.any { isTicked(it, id) }
 
     /** [removed]: extras taken out without asking, by a rule the user set for this app. */
     private fun notify(app: String, flagged: List<Finding>, removed: List<Finding> = emptyList()) {
@@ -245,6 +322,20 @@ class CheckoutWatchService : AccessibilityService() {
 
         /** Labels of boxes seen unticked on the current checkout, per app. */
         private val seenUnticked = HashMap<String, MutableSet<String>>()
+
+        /** What the model found on the current checkout, per app, so an approved fix can be applied. */
+        private val modelFound = HashMap<String, MutableList<Finding>>()
+
+        /** Screens the model has already looked at, oldest first. */
+        private val reviewed = LinkedHashSet<String>()
+        private const val MAX_REVIEWED = 40
+        private val DIGITS = Regex("""\d""")
+
+        /** One review at a time, off the main thread; the engine answers one request at a time anyway. */
+        private val reviews = Executors.newSingleThreadExecutor { r -> Thread(r, "parda-checkout-review").apply { isDaemon = true } }
+
+        /** A review that takes longer than this is dropped: by then the user has moved on. */
+        private const val REVIEW_BUDGET_MS = 15_000L
         private const val AFTER_SHEET_MS = 450L
         private const val NOTIFICATION_ID = 1
 
@@ -278,6 +369,8 @@ class CheckoutWatchService : AccessibilityService() {
             handled.remove(pkg)
             lastCheckoutAt.remove(pkg)
             seenUnticked.remove(pkg)
+            modelFound.remove(pkg)
+            synchronized(reviewed) { reviewed.removeAll { it.startsWith(pkg + "\n") } }
         }
 
         fun isEnabled(context: Context): Boolean {

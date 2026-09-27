@@ -236,6 +236,9 @@
     <string name="kind_trick_hint">“Untick if you don’t want…”</string>
     <string name="sheet_on_record">On record</string>
     <string name="air_model_recommended">Recommended</string>
+    <string name="sheet_by_model">on-device model</string>
+    <string name="ds_sneaky">late-night food, new tricks</string>
+    <string name="ds_model_only">Tricks only the on-device model catches</string>
     <plurals name="pl_decisions">
         <item quantity="one">%d decision</item>
         <item quantity="other">%d decisions</item>

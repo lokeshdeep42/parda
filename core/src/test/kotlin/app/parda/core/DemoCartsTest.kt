@@ -81,6 +81,7 @@ class DemoCartsTest {
 
     @Test fun `every cart has an id the demo store can open`() {
         assertEquals(DemoCarts.ALL.size, DemoCarts.ALL.map { it.id }.toSet().size)
-        assertEquals(expected.keys + "honest", DemoCarts.ALL.map { it.id }.toSet())
+        // "sneaky" is left to the model on purpose: see CheckoutReviewerTest.
+        assertEquals(expected.keys + "honest" + "sneaky", DemoCarts.ALL.map { it.id }.toSet())
     }
 }

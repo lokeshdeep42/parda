@@ -57,6 +57,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import app.parda.core.policy.DarkPatternKind
 import app.parda.core.checkout.Finding
+import app.parda.core.agent.Planner
 import app.parda.core.checkout.Money
 import app.parda.core.checkout.Precedents
 import app.parda.core.ledger.Channel
@@ -87,7 +88,9 @@ class InterceptActivity : ComponentActivity() {
         setContent {
             val current = intercept ?: return@setContent
             PardaTheme {
-                key(current) {
+                // Keyed by the app, not the whole intercept: rows the model adds a moment later
+                // join the same sheet without undoing what the user already unticked.
+                key(current.packageName) {
                     BackHandler { keep(current) }
                     val offers = remember(current) {
                         store.learningOffers(current.packageName, current.plan.ask.filter { it.fixable }.map { it.kind })
@@ -156,11 +159,14 @@ private fun Sheet(
     onKeep: () -> Unit,
 ) {
     val findings = intercept.plan.ask
-    val remove = remember { mutableStateMapOf<String, Boolean>().apply { findings.filter { it.fixable }.forEach { put(it.key, true) } } }
+    // Only what the user unticked is recorded; every other removable row starts ticked, including
+    // rows the on-device model adds after the sheet has opened.
+    val remove = remember { mutableStateMapOf<String, Boolean>() }
+    fun removing(f: Finding) = f.fixable && remove[f.key] != false
     // Off until the user ticks it: Parda offers to remember, it never decides to.
     var learn by remember { mutableStateOf(false) }
-    val saving = findings.filter { it.fixable && remove[it.key] == true }.sumOf { it.cost }
-    val monthly = findings.filter { it.fixable && remove[it.key] == true }.sumOf { it.recurring }
+    val saving = findings.filter(::removing).sumOf { it.cost }
+    val monthly = findings.filter(::removing).sumOf { it.recurring }
 
     // Resizable: it opens at part of the screen so the store stays visible behind it; the
     // grabber drags it between a third and nearly all of the screen, or a tap toggles it.
@@ -220,7 +226,7 @@ private fun Sheet(
                 }
             }
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                findings.forEach { f -> FindingRow(f, remove[f.key] == true) { remove[f.key] = it } }
+                findings.forEach { f -> FindingRow(f, removing(f)) { remove[f.key] = it } }
             }
 
             if (saving > 0 || monthly > 0) {
@@ -259,7 +265,7 @@ private fun Sheet(
             }
             }
 
-            val approved = findings.filter { it.fixable && remove[it.key] == true }
+            val approved = findings.filter(::removing)
             PrimaryButton(
                 if (approved.isEmpty()) stringResource(R.string.continue_) else stringResource(R.string.sheet_remove),
                 onClick = { onRemove(approved, if (learn) offers.toSet() else emptySet()) },
@@ -282,6 +288,7 @@ private fun FindingRow(f: Finding, checked: Boolean, onChecked: (Boolean) -> Uni
             Text(f.evidence, style = MaterialTheme.typography.titleMedium, maxLines = 2)
             Text(
                 "${f.kind.title} · ${f.kind.code}" +
+                    (if (f.by == Planner.MODEL) " · " + stringResource(R.string.sheet_by_model) else "") +
                     if (f.recurring > 0) stringResource(R.string.sheet_then, Money.format(f.recurring), Money.format(f.recurring * 12)) else "",
                 style = MaterialTheme.typography.bodyMedium, color = Frost.Ink2,
             )

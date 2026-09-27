@@ -8,6 +8,7 @@ import app.parda.core.agent.DisclosureGate
 import app.parda.core.agent.ModelAgent
 import app.parda.core.agent.RuleBasedAgent
 import app.parda.core.agent.TextEngine
+import app.parda.core.checkout.CheckoutReviewer
 import app.parda.core.checkout.DarkPatternScanner
 import app.parda.core.policy.DarkPatternKind
 import app.parda.core.checkout.RemovalHistory
@@ -70,6 +71,13 @@ class PardaStore(context: Context) {
             scheduleRest()
         }
     }
+
+    /**
+     * The model's second look at checkouts, when a model is installed. It wakes a resting model
+     * like any other request, and shares the engine with the Airlock (one request at a time).
+     */
+    val reviewer: CheckoutReviewer?
+        get() = if (modelFile != null) CheckoutReviewer(onDemand, scanner) else null
 
     /** The on-device model when there is one, loaded or resting; the rule-based agent otherwise. */
     val gate: DisclosureGate

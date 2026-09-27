@@ -130,7 +130,25 @@ object DemoCarts {
         ),
     )
 
-    val ALL = listOf(FASHION, FOOD, FLIGHT, MOVIE, GROCERY, HONEST)
+    /**
+     * The same tricks in words the rules do not know yet: a care plan with a brand name, a "circle"
+     * instead of a club, a "surcharge", a kitchen "closing soon". The rules see a clean checkout;
+     * this is the cart for the on-device model's second look.
+     */
+    val SNEAKY = Cart(
+        "sneaky", "Nightowl",
+        listOf(
+            Line("Chicken shawarma roll × 2", "₹398"),
+            Line("Delivery", "Free"),
+            Line("FreshCare+ for this order", "₹39", Kind.TICKED),
+            Line("Stay in the Nightowl Circle for late-night deals", "Free", Kind.TICKED),
+            Line("Late-order surcharge", "₹25", Kind.FEE),
+        ),
+        banners = listOf("Kitchen closing soon — order in the next 09:59"),
+        decline = "No thanks, I'll eat it cold",
+    )
+
+    val ALL = listOf(FASHION, FOOD, FLIGHT, MOVIE, GROCERY, HONEST, SNEAKY)
 
     fun byId(id: String?): Cart = ALL.firstOrNull { it.id == id } ?: FASHION
 }

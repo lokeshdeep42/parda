@@ -236,6 +236,9 @@
     <string name="kind_trick_hint">“వద్దనుకుంటే టిక్ తీసేయండి…”</string>
     <string name="sheet_on_record">రికార్డులో</string>
     <string name="air_model_recommended">సిఫార్సు చేసినది</string>
+    <string name="sheet_by_model">ఫోన్ మోడల్</string>
+    <string name="ds_sneaky">అర్ధరాత్రి ఆహారం, కొత్త మోసాలు</string>
+    <string name="ds_model_only">ఈ మోసాలను ఫోన్ మోడల్ మాత్రమే పట్టుకుంటుంది</string>
     <plurals name="pl_decisions">
         <item quantity="one">%d నిర్ణయం</item>
         <item quantity="other">%d నిర్ణయాలు</item>

@@ -236,6 +236,9 @@
     <string name="kind_trick_hint">“न चाहें तो टिक हटाएँ…”</string>
     <string name="sheet_on_record">रिकॉर्ड पर</string>
     <string name="air_model_recommended">सुझाया गया</string>
+    <string name="sheet_by_model">फ़ोन का मॉडल</string>
+    <string name="ds_sneaky">देर रात का खाना, नई चालें</string>
+    <string name="ds_model_only">ये चालें सिर्फ़ फ़ोन का मॉडल पकड़ता है</string>
     <plurals name="pl_decisions">
         <item quantity="one">%d फ़ैसला</item>
         <item quantity="other">%d फ़ैसले</item>

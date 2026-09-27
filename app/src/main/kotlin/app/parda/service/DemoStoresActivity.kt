@@ -104,15 +104,21 @@ class DemoStoresActivity : ComponentActivity() {
                 StrokeIcon(Icons.Chevron, tint = Frost.Ink2, size = 20.dp)
             }
             // One dot per kind of trick the shield finds in this cart, in the colours used on Home.
-            val count = pluralStringResource(R.plurals.pl_tricks, kinds.size, kinds.size)
+            // The "sneaky" cart shows none on purpose: its tricks are for the on-device model to find.
+            val forModel = cart.id == DemoCarts.SNEAKY.id
+            val count = if (forModel) stringResource(R.string.ds_model_only) else pluralStringResource(R.plurals.pl_tricks, kinds.size, kinds.size)
             val said = (listOf(count) + kinds.map { it.title }).joinToString(", ")
             Row(
                 Modifier.fillMaxWidth().clearAndSetSemantics { contentDescription = said },
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                if (kinds.isEmpty()) Dot(Frost.OkDot, size = 8.dp) else kinds.forEach { Dot(Frost.patternColor(it), size = 8.dp) }
-                Text(count, style = MaterialTheme.typography.labelMedium, color = if (kinds.isEmpty()) Frost.Ok else Frost.Ink2)
+                when {
+                    forModel -> Dot(Frost.Accent, size = 8.dp)
+                    kinds.isEmpty() -> Dot(Frost.OkDot, size = 8.dp)
+                    else -> kinds.forEach { Dot(Frost.patternColor(it), size = 8.dp) }
+                }
+                Text(count, style = MaterialTheme.typography.labelMedium, color = if (kinds.isEmpty() && !forModel) Frost.Ok else Frost.Ink2)
             }
         }
     }
@@ -121,6 +127,7 @@ class DemoStoresActivity : ComponentActivity() {
         val KIND = mapOf(
             "fashion" to R.string.ds_fashion, "food" to R.string.ds_food, "flight" to R.string.ds_flight,
             "movie" to R.string.ds_movie, "grocery" to R.string.ds_grocery, "honest" to R.string.ds_honest,
+            "sneaky" to R.string.ds_sneaky,
         )
 
         /** What the shield finds in each cart, scanned once from the same tree it reads on screen. */
